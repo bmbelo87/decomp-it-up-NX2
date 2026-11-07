@@ -91,7 +91,7 @@ static void LoadBGAForState(GameState state) {
     case STATE_STAGE_BREAK:           /* Prex3: 083.DAT + 7-1.WAV; Exceed: BGA\SB.MOV (sem .DAT) */
         bgaName = g_hexSongIds ? "" : "083"; break;
     case STATE_DANCE_GRADE_ENTER:
-    case STATE_DANCE_GRADE_DISPLAY: bgaName = g_hexSongIds ? (g_game.nxGameMode == 2 ? "WORLDGRADE" : "GRADE") : "83"; break; /* Exceed 0x40CD2A: BGA\GRADE.DAT; NX WORLD TOUR 0x808e6c6: BGA/WORLDGRADE.DAT */
+    case STATE_DANCE_GRADE_DISPLAY: bgaName = g_hexSongIds ? (g_game.nxGameMode == 2 ? "WORLDGRADE" : "DANCE_GRADE") : "83"; break;   /* era: "GRADE" (NX); NX2: CDanceGrade::Begin "BGA/DANCE_GRADE.DAT" */ /* Exceed 0x40CD2A: BGA\GRADE.DAT; NX WORLD TOUR 0x808e6c6: BGA/WORLDGRADE.DAT */
     case STATE_HOWTOPLAY: bgaName = ""; break; /* limpa BGA do menu imediatamente; 03.DAT carrega no stateFrame==1 */
     case STATE_SERVICE_MENU: bgaName = ""; break; /* SETUP MENU desenha sobre fundo preto */
     default: break;
@@ -359,6 +359,7 @@ void Game_Init(HINSTANCE hInstance) {
         const char* as = getenv("PUMPY_AUTOSTATE");
         if (as && _stricmp(as, "SELECT") == 0) { Menu_ResetState(); Game_ChangeState(STATE_SELECT); }
         if (as && _stricmp(as, "STATION") == 0) Game_ChangeState(STATE_STATION);
+        if (as && _stricmp(as, "GRADE") == 0) { Menu_ResetState(); Game_ChangeState(STATE_DANCE_GRADE_ENTER); }   /* teste: abre o Dance Grade */
         /* NX2 (teste): PUMPY_AUTOSTATE=USBIN abre direto a entrada do perfil com os dois jogadores */
         if (as && _stricmp(as, "USBIN") == 0) { Title_SetJoinedMask(3); Game_ChangeState(STATE_NX_USBIN); }
         if (as && _stricmp(as, "HIGHSCORE") == 0) Game_ChangeState(STATE_HIGHSCORE);   /* teste da tela de ranking */

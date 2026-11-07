@@ -821,6 +821,7 @@ int Texture_GetWidth(int id);
 int Texture_GetHeight(int id);
 void Texture_Draw(int id, float x, float y, float scaleX, float scaleY, float alpha);
 void Texture_DrawUV(int id, float x, float y, float w, float h, float u1, float v1, float u2, float v2, float r, float g, float b, float alpha);
+void Texture_DrawUVZ(int id, float x, float y, float w, float h, float u1, float v1, float u2, float v2, float r, float g, float b, float alpha, float zTop, float zBot);   /* extra do port: z por borda (Sink/Rise) */
 void Texture_InsetUV(int texW, int texH, float* u1, float* v1, float* u2, float* v2); /* SMOOTH: meio texel para dentro */
 void Texture_Shutdown(void);
 

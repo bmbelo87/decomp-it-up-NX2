@@ -802,12 +802,14 @@ static void nxFieldBegin(void)
      * Rotate(-90), ld = Translate(480,-80) + Rotate(90) */
     bool ua = (g_misTrack == 0x13);
     bool side = (g_misTrack == 0x12 || g_misTrack == 0x14);
+    /* Sink/Rise sem NX (playengine.cpp:2063): S3DSetProjection(90) em vez do campo ortográfico (z = +-SINK_HEIGHT*sin(y*PI/ORG_Y)) */
+    bool sr = g_game.cmdSink[0] || g_game.cmdSink[1] || g_game.cmdRise[0] || g_game.cmdRise[1];
     g_nxField = 0;
     float misShift = nxMisShift();   /* todos os caminhos (normal, NX, UA, rd/ld) */
     /* era: if (!nx && !ua && !side) return; */
-    if (!nx && !ua && !side && misShift == 0.0f && !g_game.cmdDrop) return;   /* Drop: 0x4000 UPSIDEDOWN */
-    if (nx) {
-        const double fov = 75.0, n = 0.1, f = 5000.0;
+    if (!nx && !ua && !side && misShift == 0.0f && !g_game.cmdDrop && !sr) return;   /* Drop: 0x4000 UPSIDEDOWN */
+    if (nx || sr) {
+        const double fov = nx ? 75.0 : 90.0, n = 0.1, f = 5000.0;
         double t = n * tan(fov * 0.5 * 3.14159265358979 / 180.0);
         double d = 240.0 / tan(fov * 0.5 * 3.14159265358979 / 180.0);
         glMatrixMode(GL_PROJECTION);
@@ -815,17 +817,19 @@ static void nxFieldBegin(void)
         glLoadIdentity();
         /* Drop + NX (playengine.cpp:2100): inclinação oposta (R(-120) em vez de R(-60)) com a pista virada = a tela espelhada na vertical;
          * como espelho em tela (hipótese: não conferido contra o piu), aplicado depois da projeção */
-        if (g_game.cmdDrop) glScalef(1.0f, -1.0f, 1.0f);
+        if (g_game.cmdDrop && nx) glScalef(1.0f, -1.0f, 1.0f);
         glFrustum(-t * 640.0 / 480.0, t * 640.0 / 480.0, -t, t, n, f);
         glTranslatef(-320.0f, -240.0f, 0.0f);
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
         glLoadIdentity();
         glTranslatef(0.0f, 0.0f, (float)-d);   /* = gluLookAt(0,0,d, 0,0,0, 0,1,0) */
-        glRotatef(-60.0f, 1.0f, 0.0f, 0.0f);
-        glTranslatef(320.0f, 240.0f, 0.0f);
-        glScalef(1.5f, ua ? -1.5f : 1.5f, 1.5f);
-        glTranslatef(-320.0f, -240.0f, 0.0f);
+        if (nx) {
+            glRotatef(-60.0f, 1.0f, 0.0f, 0.0f);
+            glTranslatef(320.0f, 240.0f, 0.0f);
+            glScalef(1.5f, ua ? -1.5f : 1.5f, 1.5f);
+            glTranslatef(-320.0f, -240.0f, 0.0f);
+        } else if (g_game.cmdDrop) { glTranslatef(0.0f, 480.0f, 0.0f); glScalef(1.0f, -1.0f, 1.0f); }
         g_nxField = 2;
     } else {
         glMatrixMode(GL_MODELVIEW);
@@ -842,6 +846,7 @@ static void nxFieldBegin(void)
     if (g_misTrack == 0x14) { glTranslatef(480.0f, -80.0f, 0.0f); glRotatef(90.0f, 0.0f, 0.0f, 1.0f); }    /* 0x806d566 */
     if (misShift != 0.0f) glTranslatef(misShift, 0.0f, 0.0f);   /* 0x806cc4b */
 }
+static void zTr(float z) { if (z != 0.0f) glTranslatef(0.0f, 0.0f, z); }
 static void nxFieldEnd(void)
 {
     if (g_nxField == 0) return;
@@ -1030,6 +1035,24 @@ static void zeroHoldDrawOld(int panel, int col, float left, float yh, float yt, 
  * tela = linha - v. X: 'left' = coluna + ajuste da skin; cada tile soma o
  * próprio x do .spr (rcVtx[X1]). */
 /* alpha: piu 0x806e7e4 glColor4f(1, 1, 1, a) no long inteiro (era: sempre 1) */
+/* Sink/Rise nos longs: o z varia ao longo do corpo (fita coerente entre cabeça e ponta);
+ * g_hdP = jogador (-1 = sem Sink/Rise), g_hdY0 = y do receptor (centro) */
+static int g_hdP = -1; static float g_hdY0;
+static float snkZat(float yy)
+{
+    if (g_hdP < 0) return 0.0f;
+    float h = g_game.cmdNXMode[g_hdP] ? 200.0f : 64.0f;
+    if (g_game.cmdRise[g_hdP]) h = -h;
+    return h * sinf(-nxAccelInv(g_hdP, yy - g_hdY0) * 3.141592f / 378.0f);
+}
+static bool g_hdHeld;
+/* peça do long com z por borda (cima/baixo), sem degrau nas emendas; segurado: a cabeça fica em z = 0 */
+static void hdDrawZ(int id, float x, float y, float w, float h, float u1, float v1, float u2, float v2, float r, float g, float b, float a)
+{
+    float zt = snkZat(y), zb = snkZat(y + h);
+    Texture_DrawUVZ(id, x, y, w, h, u1, v1, u2, v2, r, g, b, a, zt, zb);
+}
+static void zTr(float z);
 static void holdDraw(int panel, int col, float left, float yh, float yt, bool held, float alpha)
 {
     (void)panel;   /* segurado (held): o chamador já passa yh = receptor */
@@ -1056,10 +1079,21 @@ static void holdDraw(int panel, int col, float left, float yh, float yt, bool he
     if (height > 62.0f) {
         /* LongMiddle.DrawPicYY(st, 63 + vtxY, height + 1 + vtxY) */
         float yLo = 63.0f + (float)bt->srcY, yHi = height + 1.0f + (float)bt->srcY;
-        Texture_DrawUV(bt->texId, left + (float)bt->srcX, lineT - yHi, (float)bt->srcW, yHi - yLo,
-                       bt->u1 * bw, bt->v1 * bh, bt->u2 * bw, bt->v2 * bh, 1, 1, 1, alpha);
+        {
+            float bTop = lineT - yHi, bTotal = yHi - yLo;
+            int ns_ = (g_hdP >= 0) ? (int)(bTotal / 12.0f) + 1 : 1;
+            if (ns_ > 96) ns_ = 96;
+            float vA = bt->v1 * bh, vB = bt->v2 * bh;
+            for (int k_ = 0; k_ < ns_; k_++) {
+                float t0 = (float)k_ / ns_, t1 = (float)(k_ + 1) / ns_;
+                /* fita contínua: z por borda (a borda compartilhada tem o mesmo z nas duas fatias) */
+                Texture_DrawUVZ(bt->texId, left + (float)bt->srcX, bTop + bTotal * t0, (float)bt->srcW, bTotal * (t1 - t0),
+                                bt->u1 * bw, vA + (vB - vA) * t0, bt->u2 * bw, vA + (vB - vA) * t1, 1, 1, 1, alpha,
+                                snkZat(bTop + bTotal * t0), snkZat(bTop + bTotal * t1));
+            }
+        }
         /* LongEnd.DrawPic(st) */
-        Texture_DrawUV(tt->texId, left + (float)tt->srcX, lineT - (float)(tt->srcY + tt->srcH),
+        hdDrawZ(tt->texId, left + (float)tt->srcX, lineT - (float)(tt->srcY + tt->srcH),
                        (float)tt->srcW, (float)tt->srcH,
                        tt->u1 * tw, tt->v1 * th, tt->u2 * tw, tt->v2 * th, 1, 1, 1, alpha);
     } else if (held && g_skinTap[col] >= 0) {
@@ -1073,7 +1107,7 @@ static void holdDraw(int panel, int col, float left, float yh, float yt, bool he
         if (rowsV > (float)tt->srcH) rowsV = (float)tt->srcH;
         float len = tt->v2 - tt->v1;
         float vTop = tt->v2 - len * (rowsV / (float)tt->srcH);
-        Texture_DrawUV(tt->texId, left + (float)tt->srcX, lineT - (float)tt->srcY - rowsV, (float)tt->srcW, rowsV,
+        hdDrawZ(tt->texId, left + (float)tt->srcX, lineT - (float)tt->srcY - rowsV, (float)tt->srcW, rowsV,
                        tt->u1 * tw, vTop * th, tt->u2 * tw, tt->v2 * th, 1, 1, 1, alpha);
         int iT = g_skinTap[col] + st;
         if (iT >= g_game.sprTileCount) iT = g_skinTap[col];
@@ -1081,7 +1115,7 @@ static void holdDraw(int panel, int col, float left, float yh, float yt, bool he
         int nw = Texture_GetWidth(ns->texId); if (nw <= 0) nw = 256;
         int nh = Texture_GetHeight(ns->texId); if (nh <= 0) nh = 256;
         float lineN = lineT - height;
-        Texture_DrawUV(ns->texId, left + (float)ns->srcX, lineN - (float)(ns->srcY + ns->srcH),
+        hdDrawZ(ns->texId, left + (float)ns->srcX, lineN - (float)(ns->srcY + ns->srcH),
                        (float)ns->srcW, (float)ns->srcH,
                        ns->u1 * nw, ns->v1 * nh, ns->u2 * nw, ns->v2 * nh, 1, 1, 1, alpha);
         return;
@@ -1090,14 +1124,16 @@ static void holdDraw(int panel, int col, float left, float yh, float yt, bool he
         float yLo = (float)tt->srcY, yHi = height + 1.0f + (float)tt->srcY;
         float len = tt->v2 - tt->v1;
         float vTop = tt->v2 - len * ((height + 1.0f) / 63.0f);
-        Texture_DrawUV(tt->texId, left + (float)tt->srcX, lineT - yHi, (float)tt->srcW, yHi - yLo,
+        hdDrawZ(tt->texId, left + (float)tt->srcX, lineT - yHi, (float)tt->srcW, yHi - yLo,
                        tt->u1 * tw, vTop * th, tt->u2 * tw, tt->v2 * th, 1, 1, 1, alpha);
     }
     /* Translate(0, height); LongStart.DrawPic(st) */
     float lineH = lineT - height;
-    Texture_DrawUV(hs->texId, left + (float)hs->srcX, lineH - (float)(hs->srcY + hs->srcH),
+    g_hdHeld = held;
+    hdDrawZ(hs->texId, left + (float)hs->srcX, lineH - (float)(hs->srcY + hs->srcH),
                    (float)hs->srcW, (float)hs->srcH,
                    hs->u1 * hw, hs->v1 * hh, hs->u2 * hw, hs->v2 * hh, 1, 1, 1, alpha);
+    g_hdHeld = false;
 }
 
 static int g_hitTimer[2][MAX_PANELS]; // hit flash animation timer (p1)
@@ -4370,6 +4406,13 @@ void Gameplay_Render(void)
          * x += sin(beat_relativo*PI) * PUMP_ARROW_Y/2 -> a seta serpenteia enquanto sobe.
          * era: sinf((visualScrollRow * g_baseRowSpacing + dist/vel) / 60 * PI) * 30  (beat absoluto: offset fixo por nota, errado) */
         #define SNK_DX(yy) (g_game.cmdSnake[p] ? sinf((float)(-nxAccelInv(p, (yy) - xmY0) / (60.0f * g_scrollSpeedX[p])) * 3.141592f) * 30.0f : 0.0f)
+        /* Sink/Rise (playengine.cpp:2692): z = +-SINK_HEIGHT(_NX) * sin(y*PI/ORG_Y), y = distância linear ao receptor (ORG_Y = 378) */
+        #define SNK_Z(yy) ((g_game.cmdSink[p] || g_game.cmdRise[p]) ? (g_game.cmdRise[p] ? -1.0f : 1.0f) * (g_game.cmdNXMode[p] ? 200.0f : 64.0f) * sinf(-nxAccelInv(p, (yy) - xmY0) * 3.141592f / 378.0f) : 0.0f)
+        /* bFadeEnd (playengine.cpp:1468/2729): com Sink, Rise ou NX, a nota que passou do receptor apaga em 101 px
+         * (fade = (DRAW_START_Y - scr_y) / (DRAW_START_Y - STEP_Y) = (484 - scr_y) / (484 - 383)) */
+        #define FADE_END(yy) ((g_game.cmdSink[0] || g_game.cmdSink[1] || g_game.cmdRise[0] || g_game.cmdRise[1] || g_game.cmdNXMode[0] || g_game.cmdNXMode[1])                               && (yy) < xmY0 ? fmaxf(0.0f, 1.0f - (xmY0 - (yy)) / 101.0f) : 1.0f)
+        #define Sprite_DrawTileUV(i_, x_, y_, ...) do { float zq_ = SNK_Z(y_), am_ = g_drawAlphaMul; zTr(zq_); g_drawAlphaMul = am_ * FADE_END(y_); Sprite_DrawTileUV(i_, x_, y_, __VA_ARGS__); g_drawAlphaMul = am_; zTr(-zq_); } while (0)
+        #define Texture_DrawUV(t_, x_, y_, ...) do { float zq_ = SNK_Z(y_), am_ = g_drawAlphaMul; zTr(zq_); g_drawAlphaMul = am_ * FADE_END(y_); Texture_DrawUV(t_, x_, y_, __VA_ARGS__); g_drawAlphaMul = am_; zTr(-zq_); } while (0)
         #define XM_DX(yy) (xmS * nxAccelInv(p, (yy) - xmY0) + SNK_DX(yy))
         #define XM_DXP(pn, yy) (XM_S(pn) * nxAccelInv(p, (yy) - xmY0) + SNK_DX(yy))
 
@@ -4392,7 +4435,7 @@ void Gameplay_Render(void)
                 /* ponta de um hold a partir da cabeça h: atravessa corpo e linhas
                  * vazias (apagadas ao passar), para em outra nota */
                 #define Z_TAIL(h, out) do { out = -1;                     for (int k_ = (h) + 1; k_ < rows; k_++) { uint8_t v_ = Z_PV(k_, panel);                         if (v_ == NT_HOLD_T) { out = k_; break; }                         if (v_ != NT_HOLD_B && v_ != 0) break; } } while (0)
-                #define Z_DRAW(h, t, isHeld) do {                     float yh = ((isHeld) ? (float)(receptorY + rh2 / 2) : Z_ROWY(h)) - g_skinOffY;                     float yt = Z_ROWY(t) - g_skinOffY;                     if ((isHeld) && yt < yh) yt = yh;                     /* era: holdDraw(panel, col, posX[panel] + g_skinOffX[col] + XM_DXP(panel, yh), yh, yt, (isHeld));                      *  yh já tem o -g_skinOffY; a seta comum usa o X sem ele (XM_DXP(panel, y)) */                     float yx_ = yh + g_skinOffY;                     /* piu 0x806ebab: alpha da linha da cabeça ([0xa7f4ac0]); segurado, [0xa7f4a8c] =                      * 0 com o vanish (+0x494 & 1, 0x806ee6b) e 1 sem */                     float za_ = 1.0f;                     if (g_game.cmdVanish[p]) {                         if (isHeld) za_ = 0.0f;                         else { za_ = (yx_ - 122.0f) / 84.0f; za_ = za_ < 0.0f ? 0.0f : (za_ > 1.0f ? 1.0f : za_); }                     }                     if (g_game.cmdAppear[p]) { float f_ = (yx_ - 122.0f) / 84.0f; f_ = f_ < 0.0f ? 0.0f : (f_ > 1.0f ? 1.0f : f_); za_ = isHeld ? 1.0f : 1.0f - f_; }                     holdDraw(panel, col, posX[panel] + g_skinOffX[col] + XM_DXP(panel, yx_), yh, yt, (isHeld), za_); } while (0)
+                #define Z_DRAW(h, t, isHeld) do {                     float yh = ((isHeld) ? (float)(receptorY + rh2 / 2) : Z_ROWY(h)) - g_skinOffY;                     float yt = Z_ROWY(t) - g_skinOffY;                     if ((isHeld) && yt < yh) yt = yh;                     /* era: holdDraw(panel, col, posX[panel] + g_skinOffX[col] + XM_DXP(panel, yh), yh, yt, (isHeld));                      *  yh já tem o -g_skinOffY; a seta comum usa o X sem ele (XM_DXP(panel, y)) */                     float yx_ = yh + g_skinOffY;                     /* piu 0x806ebab: alpha da linha da cabeça ([0xa7f4ac0]); segurado, [0xa7f4a8c] =                      * 0 com o vanish (+0x494 & 1, 0x806ee6b) e 1 sem */                     float za_ = 1.0f;                     if (g_game.cmdVanish[p]) {                         if (isHeld) za_ = 0.0f;                         else { za_ = (yx_ - 122.0f) / 84.0f; za_ = za_ < 0.0f ? 0.0f : (za_ > 1.0f ? 1.0f : za_); }                     }                     if (g_game.cmdAppear[p]) { float f_ = (yx_ - 122.0f) / 84.0f; f_ = f_ < 0.0f ? 0.0f : (f_ > 1.0f ? 1.0f : f_); za_ = isHeld ? 1.0f : 1.0f - f_; }                     float amh_ = g_drawAlphaMul; if (!(isHeld)) g_drawAlphaMul = amh_ * FADE_END(yt); g_hdP = (g_game.cmdSink[p] || g_game.cmdRise[p]) ? p : -1; g_hdY0 = xmY0; holdDraw(panel, col, posX[panel] + g_skinOffX[col] + XM_DXP(panel, yx_), yh, yt, (isHeld), za_); g_hdP = -1; g_drawAlphaMul = amh_; } while (0)
                 int lastTail = -1;
                 /* 1) hold segurado: cabeça no receptor (a linha dela já foi apagada) */
                 int held = g_holdRows[p][panel];
@@ -4850,6 +4893,10 @@ void Gameplay_Render(void)
         }
         #undef XM_DX
         #undef XM_DXP
+        #undef SNK_Z
+        #undef FADE_END
+        #undef Sprite_DrawTileUV
+        #undef Texture_DrawUV
         #undef XM_S
         g_drawAlphaMul = 1.0f;
         nxFieldEnd();

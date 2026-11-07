@@ -65,8 +65,9 @@ Being ported on top of the NX tree, checked against the real `piu` ELF (the NX2C
 | CENTER flow: 1st press selects, 2nd starts, locked song = WRONG, then `RUN` | ✅ |
 | Command codes (queue of 16 keys per player, order of `g_Cmd_1p`) with `CCommandIcon` groups | ✅ |
 | Appear, Drop (code + gameplay)                                   | ✅ Appear confirmed by the user; Drop with NX is a hypothesis |
-| Snake (relative-beat sine, `playengine.cpp:2721`)                | ⚙️ Fixed after the first attempt; still to be checked in play |
-| Sink / Rise                                                      | ⚙️ Codes and icons only, no gameplay effect yet (needs perspective / Z) |
+| Snake (relative-beat sine, `playengine.cpp:2721`)                | ✅ Confirmed by the user |
+| Sink / Rise (90° perspective, `z = ±64·sin(y·π/378)`, `bFadeEnd` fade) | ✅ Port extra on longs: z per edge (continuous ribbon) instead of the original's single flat z |
+| Dance Grade (`DANCE_GRADE.DAT`: grade_in / grade_hold / grade_out, `1p/2p_rank_x`, TICK / RANK sounds) | ✅ VANILLA has no CENTER shortcut, MODDED needs 3; Battle WIN/LOSE not ported |
 | Skins, Hard Judge, late join, mileage locks, 2P and Special in Select | ❌ Pending |
 | 5X / 6X / +0.5X                                                  | ❌ Only for the MODDED style |
 

@@ -400,7 +400,17 @@ static void resGradeSounds(int t)
  *   38/39 (P2) recebem a letra (fontes S 38, A 24, B 54, C 55, D 56, F 58,
  *   0x8073502) e toca "1p_rank" / "2p_rank" (0x807430c).
  *   Não portado: WIN/LOSE/DRAW do BATTLE (0x8073f4x). */
-static const int k_nxDGY[7] = { 372, 322, 268, 210, 158, 103, 47 };
+/* NX2: CDanceGrade (dancegrade.cpp) + /SCRIPT/UI/DANCEGRADE.LUA: SCORE_Y_1 = 350, HEIGHT = 42, SCORE_DRAW_START_TIME 20,
+ * SCORE_DRAW_TIME_INTERVAL 4, GRADE_DRAW_START_TIME 120, GRADE_SOUND_EFFECT_TIME 140, FADEOUT_START_TIME 600.
+ * Start: BGA 'grade_in' até acabar (o contador m_iCnt só anda no Run); Run: 'grade_hold' todo quadro, números, letra
+ * '%dp_rank_%c' (DrawScene) e o BG.MOV; End: 'grade_out' + preto em 30 quadros. Sai com 3x CENTER (BN_5 x3) = pula para o fade.
+ * era (NX): { 372, 322, 268, 210, 158, 103, 47 }, 90 / 4 / 210 / 235, cena "grade start" e camadas de letra do GRADE.DAT */
+static const int k_nxDGY[7] = { 350, 308, 266, 224, 182, 140, 98 };
+#define DG_SCORE_T0   20
+#define DG_SCORE_DT   4
+#define DG_GRADE_T    120
+#define DG_SND_T      140
+static bool s_dgIn;       /* grade_in ainda tocando (Start) */
 static BGALayerSrc g_nxLetter[6];
 static bool g_nxLetterOk;
 
@@ -482,12 +492,13 @@ static void zDanceGradeEnter(void)
     snprintf(path, sizeof(path), "%s/BGA/BG.MOV", g_game.currentDirectory);
     Movie_Open(path, true);
     g_nxLetterOk = false;
+    s_dgIn = true;
     for (int p = 0; p < 2; p++)
         for (int i = 0; i < 7; i++) g_zDigits[p][i] = zDigitCount(zValue(p, i));
     g_zLastTick = -100;
     if (!g_zSndInit) {
         static const char* const k_wav[14] = {
-            "8-1.WAV", "9-5.WAV",
+            "TICK.WAV", "RANK.WAV",   /* NX2 SFX_DANCEGRADE.LUA: EFF_TICK, EFF_ANNOUNCE (era NX: 8-1 / 9-5) */
             "RANK_S.WAV", "RANK_A.WAV", "RANK_B.WAV", "RANK_C.WAV", "RANK_D.WAV", "RANK_F.WAV",
             "9-S.WAV", "9-A.WAV", "9-B.WAV", "9-C.WAV", "9-D.WAV", "9-F.WAV",
         };
@@ -514,88 +525,87 @@ static bool s_dgFinish;   /* pulou: o render leva as cenas da tela ao último qu
 
 static bool zDanceGradeUpdate(int* tp, float dt)   /* era: (int t, float dt) */
 {
-    if (Movie_IsOpen()) Movie_Update(dt);
-    if (*tp > 30 && *tp < 600) {
+    if (Movie_IsOpen() && *tp < 600) Movie_Update(dt);
+    /* Start (dancegrade.cpp:477): m_iCnt só anda depois do grade_in */
+    if (s_dgIn) {
+        if (g_game.bgaPicCount <= 0 || BGA_SceneDone(0, "grade_in")) s_dgIn = false;
+        *tp = -1;                                              /* Result_Update soma 1: o Run começa em 0 */
+        return false;
+    }
+    if (*tp < 600) {
         for (int p = 0; p < 2; p++)
             if ((g_game.activePlayerMask & (1 << p)) && Input_IsPadHit(p, PAD_C)) s_dgCenter++;
         if (Input_IsKeyHit(VK_RETURN) || Input_IsKeyHit(VK_SPACE)) s_dgCenter++;
-        if (s_dgCenter >= (g_game.gameStyleModded ? 3 : 1)) { *tp = 599; s_dgFinish = true; }
+        /* NX2: g_skip1P/2P = BN_5 x3 -> m_iCnt = FADEOUT_START_TIME; (VANILLA: 1 CENTER depois de 30 quadros, pedido do usuário) */
+        /* VANILLA: sem atalho (espera a tela sair sozinha); MODDED: 3 CENTER (pedido do usuário) */
+        if (g_game.gameStyleModded && s_dgCenter >= 3) { *tp = 599; s_dgFinish = true; }
     }
     int t = *tp;
-    int maxD = 3;
+    int maxD = 3;                                              /* maxwidth: dígitos do TOTAL SCORE */
     for (int p = 0; p < 2; p++)
-        if (g_game.activePlayerMask & (1 << p))
-            for (int i = 0; i < 7; i++) if (g_zDigits[p][i] > maxD) maxD = g_zDigits[p][i];
+        if ((g_game.activePlayerMask & (1 << p)) && g_zDigits[p][6] > maxD) maxD = g_zDigits[p][6];
     /* EFF_TICK: a cada 5 quadros enquanto os números rolam */
-    if (t >= 90 && t - g_zLastTick >= 5 && t <= 90 + 6 * 4 + maxD * 10) {
+    if (t >= DG_SCORE_T0 && t - g_zLastTick > 4 && t <= DG_SCORE_T0 + DG_SCORE_DT * 6 + 10 * maxD) {
         g_zLastTick = t;
         zPlay(0);
     }
-    if (t == 230) zPlay(1);                                   /* EFF_ANNOUNCE */
-    if (t == 235) {                                           /* melhor nota */
+    if (t == DG_SND_T) zPlay(1);                              /* EFF_ANNOUNCE */
+    if (t == DG_SND_T + 5) {                                  /* melhor nota */
         int best = 5;
         if ((g_game.activePlayerMask & 1) && g_gradeP1 < best) best = g_gradeP1;
         if ((g_game.activePlayerMask & 2) && g_gradeP2 < best) best = g_gradeP2;
         zPlay(8 + best);                                      /* EFF_RANK_x_B */
         zPlay(2 + best);                                      /* EFF_RANK_x */
     }
-
-    /* era: com t >= 60 qualquer CENTER/Enter/Espaço saía na hora (return true), sem o fade
-     * e passando por cima da contagem do MODDED. O pulo agora é só o de cima. */
-
-    /* era (Zero): também saía no fim do GRADE.MOV; o BG.MOV da NX é em loop */
+    /* pedido do usuário: com os itens já esmaecidos pelo 'grade_out' a tela pode encerrar (era: só em 630) */
+    if (t > 600 && g_game.bgaPicCount > 0 && BGA_SceneDone(0, "grade_out")) return true;
     return t >= 630;
 }
 
 static void zDanceGradeRender(int t)
 {
-    if (Movie_IsOpen()) Movie_Render();
+    /* End() (dancegrade.cpp) não chama g_Movie.Play: o vídeo de fundo só existe no Start e no Run */
+    if (Movie_IsOpen() && t < 600) Movie_Render();
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    if (g_game.bgaPicCount > 0) {
-        if (!g_nxLetterOk) {   /* 0x8073502: S A B C D F */
-            static const int k_src[6] = { 38, 24, 54, 55, 56, 58 };
-            g_nxLetterOk = true;
-            for (int i = 0; i < 6; i++) g_nxLetterOk &= BGA_GetLayerSrc(0, k_src[i], &g_nxLetter[i]);
-            if (!g_nxLetterOk) Log_Print("DG: camadas das letras do GRADE.DAT faltando\n");
-            BGA_SceneReset(0, "grade start");
-            BGA_SceneReset(0, "1p_rank");
-            BGA_SceneReset(0, "2p_rank");
-        }
-        if (s_dgFinish && g_nxLetterOk) {   /* pulo: entrada da tela e letras já no fim */
-            s_dgFinish = false;
-            BGA_SceneFinish(0, "grade start");
-            BGA_SceneFinish(0, "1p_rank");
-            BGA_SceneFinish(0, "2p_rank");
-        }
-        BGA_ScenePlay(0, "grade start", true);   /* 0x8073867 */
+    if (s_dgIn) {                                              /* Start: DrawScene("grade_in") */
+        if (g_game.bgaPicCount > 0) BGA_ScenePlay(0, "grade_in", true);
+        return;
     }
-    static const char* const k_letter[2][6] = {
-        { "1P_S", "1P_A", "1P_B", "1P_C", "1P_D", "1P_F" },
-        { "2P_S", "2P_A", "2P_B", "2P_C", "2P_D", "2P_F" },
-    };
+    if (g_game.bgaPicCount > 0) {
+        if (s_dgFinish) {                                      /* pulo: as cenas já no fim */
+            s_dgFinish = false;
+            for (int p = 0; p < 2; p++) {
+                static const char* const k_f[2][6] = {
+                    { "1p_rank_S", "1p_rank_A", "1p_rank_B", "1p_rank_C", "1p_rank_D", "1p_rank_F" },
+                    { "2p_rank_S", "2p_rank_A", "2p_rank_B", "2p_rank_C", "2p_rank_D", "2p_rank_F" } };
+                int g = (p == 0) ? g_gradeP1 : g_gradeP2;
+                if (g < 0 || g > 5) g = 5;
+                BGA_SceneFinish(0, k_f[p][g]);
+            }
+        }
+        if (t < 600) BGA_ScenePlay(0, "grade_hold", true);     /* Run: DrawScene("grade_hold") */
+    }
     for (int p = 0; p < 2; p++) {
         if (!(g_game.activePlayerMask & (1 << p))) continue;
         for (int i = 0; i < 7; i++) {
-            int t0 = 90 + 4 * i;
-            if (t < t0) break;
-            int y = k_nxDGY[i], nd = g_zDigits[p][i];   /* era (Zero): 323 - 42 * i */
+            int t0 = DG_SCORE_T0 + DG_SCORE_DT * i;
+            if (t < t0 || t >= 600) break;   /* End(): só 'grade_out' + preto, sem os números */
+            int y = k_nxDGY[i], nd = g_zDigits[p][i];
             if (p == 0) zNumP1(150 - (7 - nd) * 22, y, zValue(p, i), nd, t - t0);
             else        zNumP2(585, y, zValue(p, i), nd, t - t0);
         }
-        if (t >= 210 && g_game.bgaPicCount > 0) {
+        if (t >= DG_GRADE_T && t < 600 && g_game.bgaPicCount > 0) {
+            static const char* const k_rank[2][6] = {
+                { "1p_rank_S", "1p_rank_A", "1p_rank_B", "1p_rank_C", "1p_rank_D", "1p_rank_F" },
+                { "2p_rank_S", "2p_rank_A", "2p_rank_B", "2p_rank_C", "2p_rank_D", "2p_rank_F" } };
             int g = (p == 0) ? g_gradeP1 : g_gradeP2;
             if (g < 0 || g > 5) g = 5;
-            /* era (Zero): BGA_ScenePlay(0, k_letter[p][g], true); */
-            (void)k_letter;
-            if (g_nxLetterOk) {
-                BGA_SetLayerSrc(0, p ? 38 : 24, &g_nxLetter[g]);
-                BGA_SetLayerSrc(0, p ? 39 : 25, &g_nxLetter[g]);
-                BGA_ScenePlay(0, p ? "2p_rank" : "1p_rank", true);
-            }
+            BGA_ScenePlay(0, k_rank[p][g], true);              /* DrawScene(m_iSceneGrade[p][a]) */
         }
     }
-    if (t >= 600) {                                           /* fade 600..630 */
+    if (t >= 600) {                                           /* End: 'grade_out' + fade 600..630 */
+        if (g_game.bgaPicCount > 0) BGA_ScenePlay(0, "grade_out", true);
         float a = (float)(t - 600) / 30.0f;
         if (a > 1.0f) a = 1.0f;
         glDisable(GL_TEXTURE_2D);

@@ -899,8 +899,17 @@ void Texture_InsetUV(int texW, int texH, float* u1, float* v1, float* u2, float*
     }
 }
 
+/* extra do port (Sink/Rise nos longs): z por borda do quad, zTop = borda de cima (y menor), zBot = borda de baixo */
+void Texture_DrawUVZ(int id, float x, float y, float w, float h,
+                     float u1, float v1, float u2, float v2, float r, float g, float b, float alpha,
+                     float zTop, float zBot);
 void Texture_DrawUV(int id, float x, float y, float w, float h,
                      float u1, float v1, float u2, float v2, float r, float g, float b, float alpha) {
+    Texture_DrawUVZ(id, x, y, w, h, u1, v1, u2, v2, r, g, b, alpha, 0.0f, 0.0f);
+}
+void Texture_DrawUVZ(int id, float x, float y, float w, float h,
+                     float u1, float v1, float u2, float v2, float r, float g, float b, float alpha,
+                     float zTop, float zBot) {
     alpha *= g_drawAlphaMul;
     if (id < 0 || id >= MAX_TEXTURES || !g_game.textures[id].inUse) return;
     Texture* t = &g_game.textures[id];
@@ -938,13 +947,13 @@ void Texture_DrawUV(int id, float x, float y, float w, float h,
     }
     glBegin(GL_QUADS);
     glTexCoord2f(nu1, nv2);
-    glVertex2f(x, yUp);
+    glVertex3f(x, yUp, zBot);
     glTexCoord2f(nu2, nv2);
-    glVertex2f(x + w, yUp);
+    glVertex3f(x + w, yUp, zBot);
     glTexCoord2f(nu2, nv1);
-    glVertex2f(x + w, yUp + h);
+    glVertex3f(x + w, yUp + h, zTop);
     glTexCoord2f(nu1, nv1);
-    glVertex2f(x, yUp + h);
+    glVertex3f(x, yUp + h, zTop);
     glEnd();
 }
 
