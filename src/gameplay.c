@@ -805,7 +805,7 @@ static void nxFieldBegin(void)
     g_nxField = 0;
     float misShift = nxMisShift();   /* todos os caminhos (normal, NX, UA, rd/ld) */
     /* era: if (!nx && !ua && !side) return; */
-    if (!nx && !ua && !side && misShift == 0.0f) return;
+    if (!nx && !ua && !side && misShift == 0.0f && !g_game.cmdDrop) return;   /* Drop: 0x4000 UPSIDEDOWN */
     if (nx) {
         const double fov = 75.0, n = 0.1, f = 5000.0;
         double t = n * tan(fov * 0.5 * 3.14159265358979 / 180.0);
@@ -813,6 +813,9 @@ static void nxFieldBegin(void)
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
         glLoadIdentity();
+        /* Drop + NX (playengine.cpp:2100): inclinação oposta (R(-120) em vez de R(-60)) com a pista virada = a tela espelhada na vertical;
+         * como espelho em tela (hipótese: não conferido contra o piu), aplicado depois da projeção */
+        if (g_game.cmdDrop) glScalef(1.0f, -1.0f, 1.0f);
         glFrustum(-t * 640.0 / 480.0, t * 640.0 / 480.0, -t, t, n, f);
         glTranslatef(-320.0f, -240.0f, 0.0f);
         glMatrixMode(GL_MODELVIEW);
@@ -827,6 +830,8 @@ static void nxFieldBegin(void)
     } else {
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
+        /* Drop sem NX (playengine.cpp:2067): Translate(0,480) + Scale(1,-1,1) antes de qualquer rotação */
+        if (g_game.cmdDrop) { glTranslatef(0.0f, 480.0f, 0.0f); glScalef(1.0f, -1.0f, 1.0f); }
         g_nxField = 1;
     }
     if (ua) {
@@ -1392,6 +1397,10 @@ static bool loadChartForSong(int songId, int diffTier, const char* modeName)
             g_game.cmdEarthworm[0]      = g_game.cmdEarthworm[1];
             g_game.cmdFreedom[0]        = g_game.cmdFreedom[1];
             g_game.cmdVanish[0]         = g_game.cmdVanish[1];
+            g_game.cmdAppear[0]         = g_game.cmdAppear[1];
+            g_game.cmdSnake[0]          = g_game.cmdSnake[1];
+            g_game.cmdSink[0]           = g_game.cmdSink[1];
+            g_game.cmdRise[0]           = g_game.cmdRise[1];
             g_game.cmdNonStep[0]        = g_game.cmdNonStep[1];
             g_game.cmdXMode[0]          = g_game.cmdXMode[1];
             g_game.cmdAccel[0]          = g_game.cmdAccel[1];
@@ -4356,8 +4365,13 @@ void Gameplay_Render(void)
         #define XM_S(pn) ((isDoubleOrNightmare && (pn) >= 5) ? -xmS : xmS)
         /* era: #define XM_DX(yy) (xmS * ((yy) - xmY0))
          *      #define XM_DXP(pn, yy) (XM_S(pn) * ((yy) - xmY0))  (distância já curvada pelo AC/DC) */
-        #define XM_DX(yy) (xmS * nxAccelInv(p, (yy) - xmY0))
-        #define XM_DXP(pn, yy) (XM_S(pn) * nxAccelInv(p, (yy) - xmY0))
+        /* Snake (playengine.cpp:2685/2721): BlockBeat+BeatInBlock é a distância RELATIVA ao receptor em beats
+         * (y = beat*PUMP_ARROW_Y*speed, y<0 = já passou), não o beat absoluto da música:
+         * x += sin(beat_relativo*PI) * PUMP_ARROW_Y/2 -> a seta serpenteia enquanto sobe.
+         * era: sinf((visualScrollRow * g_baseRowSpacing + dist/vel) / 60 * PI) * 30  (beat absoluto: offset fixo por nota, errado) */
+        #define SNK_DX(yy) (g_game.cmdSnake[p] ? sinf((float)(-nxAccelInv(p, (yy) - xmY0) / (60.0f * g_scrollSpeedX[p])) * 3.141592f) * 30.0f : 0.0f)
+        #define XM_DX(yy) (xmS * nxAccelInv(p, (yy) - xmY0) + SNK_DX(yy))
+        #define XM_DXP(pn, yy) (XM_S(pn) * nxAccelInv(p, (yy) - xmY0) + SNK_DX(yy))
 
         /* Zero (piu 0x8087520): long note pela skin em uso.
          *   linha da nota = base da seta (a seta ocupa 64 px acima dela);
@@ -4378,7 +4392,7 @@ void Gameplay_Render(void)
                 /* ponta de um hold a partir da cabeça h: atravessa corpo e linhas
                  * vazias (apagadas ao passar), para em outra nota */
                 #define Z_TAIL(h, out) do { out = -1;                     for (int k_ = (h) + 1; k_ < rows; k_++) { uint8_t v_ = Z_PV(k_, panel);                         if (v_ == NT_HOLD_T) { out = k_; break; }                         if (v_ != NT_HOLD_B && v_ != 0) break; } } while (0)
-                #define Z_DRAW(h, t, isHeld) do {                     float yh = ((isHeld) ? (float)(receptorY + rh2 / 2) : Z_ROWY(h)) - g_skinOffY;                     float yt = Z_ROWY(t) - g_skinOffY;                     if ((isHeld) && yt < yh) yt = yh;                     /* era: holdDraw(panel, col, posX[panel] + g_skinOffX[col] + XM_DXP(panel, yh), yh, yt, (isHeld));                      *  yh já tem o -g_skinOffY; a seta comum usa o X sem ele (XM_DXP(panel, y)) */                     float yx_ = yh + g_skinOffY;                     /* piu 0x806ebab: alpha da linha da cabeça ([0xa7f4ac0]); segurado, [0xa7f4a8c] =                      * 0 com o vanish (+0x494 & 1, 0x806ee6b) e 1 sem */                     float za_ = 1.0f;                     if (g_game.cmdVanish[p]) {                         if (isHeld) za_ = 0.0f;                         else { za_ = (yx_ - 122.0f) / 84.0f; za_ = za_ < 0.0f ? 0.0f : (za_ > 1.0f ? 1.0f : za_); }                     }                     holdDraw(panel, col, posX[panel] + g_skinOffX[col] + XM_DXP(panel, yx_), yh, yt, (isHeld), za_); } while (0)
+                #define Z_DRAW(h, t, isHeld) do {                     float yh = ((isHeld) ? (float)(receptorY + rh2 / 2) : Z_ROWY(h)) - g_skinOffY;                     float yt = Z_ROWY(t) - g_skinOffY;                     if ((isHeld) && yt < yh) yt = yh;                     /* era: holdDraw(panel, col, posX[panel] + g_skinOffX[col] + XM_DXP(panel, yh), yh, yt, (isHeld));                      *  yh já tem o -g_skinOffY; a seta comum usa o X sem ele (XM_DXP(panel, y)) */                     float yx_ = yh + g_skinOffY;                     /* piu 0x806ebab: alpha da linha da cabeça ([0xa7f4ac0]); segurado, [0xa7f4a8c] =                      * 0 com o vanish (+0x494 & 1, 0x806ee6b) e 1 sem */                     float za_ = 1.0f;                     if (g_game.cmdVanish[p]) {                         if (isHeld) za_ = 0.0f;                         else { za_ = (yx_ - 122.0f) / 84.0f; za_ = za_ < 0.0f ? 0.0f : (za_ > 1.0f ? 1.0f : za_); }                     }                     if (g_game.cmdAppear[p]) { float f_ = (yx_ - 122.0f) / 84.0f; f_ = f_ < 0.0f ? 0.0f : (f_ > 1.0f ? 1.0f : f_); za_ = isHeld ? 1.0f : 1.0f - f_; }                     holdDraw(panel, col, posX[panel] + g_skinOffX[col] + XM_DXP(panel, yx_), yh, yt, (isHeld), za_); } while (0)
                 int lastTail = -1;
                 /* 1) hold segurado: cabeça no receptor (a linha dela já foi apagada) */
                 int held = g_holdRows[p][panel];
@@ -4538,6 +4552,11 @@ void Gameplay_Render(void)
                         }
                         (void)sprH;
                         float bodyAlpha = 1.0f;
+                        if (g_game.cmdAppear[p]) {
+                            float fade = ((y1 + totalH / 2.0f) - 122.0f) / 84.0f;
+                            fade = fade < 0.0f ? 0.0f : (fade > 1.0f ? 1.0f : fade);
+                            bodyAlpha = 1.0f - fade;
+                        }
                         if (g_game.cmdVanish[p]) {
                             /* Thresholds derivados do PUMPY.EXE (Ghidra):
                              * _DAT_004349ac=196, _DAT_00434934=256, ref=316
@@ -4663,6 +4682,11 @@ void Gameplay_Render(void)
                     tailSkinDX = (aw - sw) / 2.0f + g_skinOffX[arrowIdx];
                 }
                 float tailAlpha = 1.0f;
+                if (g_game.cmdAppear[p]) {
+                    float fade = (y - 122.0f) / 84.0f;
+                    fade = fade < 0.0f ? 0.0f : (fade > 1.0f ? 1.0f : fade);
+                    tailAlpha = 1.0f - fade;
+                }
                 if (g_game.cmdVanish[p]) {
                     float fade = (y - 122.0f) / 84.0f;
                     tailAlpha = fade < 0.0f ? 0.0f : (fade > 1.0f ? 1.0f : fade);
@@ -4764,6 +4788,11 @@ void Gameplay_Render(void)
                     float sw = (float)g_game.sprTiles[aidx].srcW;
                     float sh = (float)g_game.sprTiles[aidx].srcH;
                     float noteAlpha = 1.0f;
+                    if (g_game.cmdAppear[p]) {
+                        float fade = (y - 122.0f) / 84.0f;
+                        fade = fade < 0.0f ? 0.0f : (fade > 1.0f ? 1.0f : fade);
+                        noteAlpha = 1.0f - fade;
+                    }
                     if (g_game.cmdVanish[p]) {
                         float fade = (y - 122.0f) / 84.0f;
                         noteAlpha = fade < 0.0f ? 0.0f : (fade > 1.0f ? 1.0f : fade);

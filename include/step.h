@@ -113,6 +113,9 @@ typedef struct {
 } StepSong;
 
 bool Step_LoadSong(const char* path, StepSong* song);
+/* NX2: STEP/<id>/<MODO>.NX (step_nx.c). dir = ".../STEP/<id>" */
+bool Step_LoadNX(const char* dir, StepSong* song);
+bool Step_NXExists(const char* dir);
 void Step_FreeSong(StepSong* song);
 int Step_SelectChart(const char* modeName, int fallbackSection);
 int Step_SelectChartInSong(const StepSong* song, const char* modeName, int fallbackSection);

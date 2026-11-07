@@ -158,6 +158,17 @@ bool Step_LoadSong(const char* path, StepSong* song)
 {
     memset(song, 0, sizeof(StepSong));
 
+    /* NX2: o chart é uma pasta STEP/<id>/ com os .NX (sem .SEE). Os chamadores seguem
+     * montando ".../STEP/<id>.SEE"; aqui a extensão vira a pasta. */
+    {
+        size_t n = strlen(path);
+        if (n > 4 && _stricmp(path + n - 4, ".SEE") == 0) {
+            char dir[1024];
+            snprintf(dir, sizeof(dir), "%.*s", (int)(n - 4), path);
+            if (Step_NXExists(dir)) return Step_LoadNX(dir, song);
+        }
+    }
+
     FILE* f = stepOpen(path);
     if (!f) return false;
 

@@ -28,7 +28,8 @@ static uint32_t rd32(const uint8_t* p) { return (uint32_t)p[0] | ((uint32_t)p[1]
 static void wr32(uint8_t* p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
 static uint8_t* ent(int i) { return s_rk + 4 + i * 8; }
 
-static void rkPath(char* out, size_t n) { snprintf(out, n, "%s/SETTINGS/RANK.DAT", g_game.currentDirectory); }
+/* era: "%s/SETTINGS/RANK.DAT" (NX). NX2: o jogo guarda os arquivos da máquina em save/ (mesmo formato: 0x2a4 bytes) */
+static void rkPath(char* out, size_t n) { snprintf(out, n, "%s/save/RANK.DAT", g_game.currentDirectory); }
 
 /* 0x805f8c0 */
 static void rkSet(int i, uint32_t score, const char* name) {

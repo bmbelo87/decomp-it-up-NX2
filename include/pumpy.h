@@ -128,6 +128,7 @@ typedef enum {
     STATE_NAMEINPUT       = 0x95, /* Exceed: CNameInput — BGA\085.DAT (src/nameinput.c) */
     STATE_STATION         = 0x96, /* Exceed2: CStation — BGA\STATION.DAT (src/station.c) */
     STATE_NX_CLEAR        = 0x98, /* NX WORLD TOUR: MISSIONCLEAR (CMissionClear) — BGA/CONQUEST.MOV (src/nx_mission.c) */
+    STATE_NX_USBIN        = 0x9A, /* NX2: entrada do perfil (CUsbin, USB_INPUT) — BGA/USB_*.DAT (src/nx2_usbin.c) */
     STATE_NX_SPORTS       = 0x99, /* NX: kcal do fim do crédito (CSports) — BGA/SPORTS.DAT (src/nx_sports.c) */
     STATE_NX_MISSION      = 0x97, /* NX WORLD TOUR: objetivo da missão — BGA\MICF.DAT (src/nx_mission.c) */
     STATE_EXIT            = 0xFF,
@@ -165,11 +166,15 @@ typedef enum {
 /* era: 209. +1: DB52 (Novasonic Remix) */
 /* era: 210. +40 que no NX só têm o step (áudio, BGA, capa e disco do Exceed 2 / Exceed) */
 /* era: 263. +13 charts órfãos com níveis exclusivos no Another (FIRE NM 12, FIRE NM 19, C23, C26, A-25, A101, B902, B501, C28, C25, C182, 2516, C32; FFC04 removido por ser clone do Arcade) */
-#define SONG_TABLE_COUNT     276   /* NX: tabela base + FIRE + extras do port + 13 Another com charts exclusivos */
-#define NX_SONG_BASE      193   /* índices >= este são extras do port (fora do piu) */
-#define NX_SONG_OLD_BASE  196   /* índices >= este só entram com USE OLD DATA SONGS ligado */
+//#define SONG_TABLE_COUNT     276   /* NX: tabela base + FIRE + extras do port + 13 Another com charts exclusivos */
+#define SONG_TABLE_COUNT     220   /* NX2: 220 x 0x5C em 0x0810e520 (tools/gen_nx2_songs.py) */
+//#define NX_SONG_BASE      193   /* índices >= este são extras do port (fora do piu) */
+#define NX_SONG_BASE      220   /* NX2: sem extras do port (índices >= este); era 193 na NX */
+//#define NX_SONG_OLD_BASE  196   /* índices >= este só entram com USE OLD DATA SONGS ligado */
+#define NX_SONG_OLD_BASE  220   /* NX2: sem extras de USE OLD DATA SONGS; era 196 na NX */
 #define SONG_CHANNEL_COUNT  7     /* campo +0x1C (nomes = hipotese pelos ids) */
-#define SONG_CHANNEL_MAX    64    /* maior canal + extras + 0 final */
+//#define SONG_CHANNEL_MAX    64    /* maior canal + extras + 0 final */
+#define SONG_CHANNEL_MAX    50    /* NX2: maior canal (K-POP, 49) + 0 final */
 #define SONG_CH_NX       0
 #define SONG_CH_KPOP     1
 #define SONG_CH_POP      2
@@ -177,7 +182,8 @@ typedef enum {
 #define SONG_CH_FULLSONG 4
 #define SONG_CH_REMIX    5
 #define SONG_CH_ANOTHER  6
-#define NX_RESMAP_COUNT 328     /* pares { recurso, chart } em 0x0813f860 (0x8061d10) */
+//#define NX_RESMAP_COUNT 328     /* pares { recurso, chart } em 0x0813f860 (0x8061d10) */
+#define NX_RESMAP_COUNT 214     /* NX2: pares { recurso, chart } em 0x0810de08 */
 typedef struct {
     uint32_t    id;         /* +0x00  hex -> "%X" nos nomes de arquivo */
     const char* artistKr;   /* +0x04 */
@@ -251,6 +257,11 @@ extern int g_nxDiffIdx[2];      /* dificuldade por jogador (0 N, 1 H, 2 C, 3 D, 
 void NxFont_Draw(float x, float y, const char* s);   /* nx_font.c: fonte do SETUP (CP949) */
 bool Gameplay_IsFrozen(void);  /* gameplay.c: stage break, tela parada */
 GameState NxSports_Route(GameState ns, bool fromStageBreak, int stage);
+void Nx2Select_Enter(void);        /* nx2_select.c — CSelect do NX2 (Arcade Station / Special Zone) */
+void Nx2Select_Update(float dt);
+void Nx2Select_Render(void);
+void NxUsbIn_Update(float dt);   /* nx2_usbin.c */
+void NxUsbIn_Render(void);
 void NxSports_Update(float dt);
 void NxSports_Render(void);
 extern int g_nxTrainN;          /* lição * 10 + parte (1..20, 1..3) do RUN T%02d%d ([+0xd2cc]) */
@@ -266,6 +277,108 @@ bool Select_StartMission(int id, int diff, int level, unsigned joined);
 /* era: extern const TrackEntry. Deixou de ser const para o USE OLD DATA SONGS ligar e desligar
  * os modos recuperados de .STX antigos (OldData_ApplyModes); nada mais escreve na tabela. */
 extern TrackEntry g_songTable[SONG_TABLE_COUNT];
+/* NX2 (SongList_t, 92 bytes no piu): campos que o TrackEntry da NX não tem. Mesma ordem de g_songTable
+ * (src/nx2_songs.c, tools/gen_nx2_songs.py). censor/hiddenPlay: GetEnabledSongList pula (songmanager.cpp
+ * do nx2src); enableM/hiddenM = estado da máquina, enablePlay/hiddenPlay = com os desbloqueios do jogador. */
+typedef struct { uint8_t censor, censorLock, enableM, hiddenM, enablePlay, hiddenPlay;
+                 uint8_t enableModePlay[5]; int16_t songMileage; int16_t modeMileage[5]; } Nx2SongExtra;
+extern const Nx2SongExtra g_nx2SongExtra[SONG_TABLE_COUNT];
+
+/* ---------------------------------------------------------------------------------------------
+ * NX2: arquivos de save (src/nx2_save.c). Layout derivado do nx2src (usbmanager.h/setupmgr.h/
+ * rankmanager.h/missionrankmanager.h), conferido byte a byte com amostras reais (tamanhos exatos,
+ * Adler-32 válido e ida-e-volta idêntica). `#pragma pack` do original: 4 no strucStat, 1 no option.
+ *   PIUNX2.INI  Nx2Option  31832 B  plano, Adler-32 de _ident até _chksum
+ *   RANK.DAT    Nx2Rank      676 B  plano, Adler-32 de m_Scores
+ *   MRANK.DAT   Nx2MRank  120004 B  plano, Adler-32 de m_Scores
+ *   nx2save.bin Nx2Review+Nx2Stat  30780 B (Stat cifrado por Enc/Dec + Adler-32 após o 1º u32)
+ *   nx2rank.bin Nx2RankInfo 16392 B (cifrado por Enc/Dec + Adler-32 após o 1º u32)
+ * ------------------------------------------------------------------------------------------- */
+#define NX2_ID_MAX      12
+#define NX2_SONG_MAX    256
+#define NX2_MISSION_MAX 1024
+#define NX2_MAX_STAGE   4
+#pragma pack(push, 1)
+typedef struct { int16_t year; int8_t month, day, hour, min; uint16_t ms; } Nx2Time;
+#pragma pack(pop)
+#pragma pack(push, 4)
+typedef struct {
+    uint32_t CheckSum;                       /* Adler-32 dos bytes seguintes, já decifrados */
+    char     szSerial[64];                   /* série do pendrive (a verificação só vale no arcade) */
+    Nx2Time  Time;
+    int32_t  iCharacter, iRank, iCountryCode;
+    char     PlayerID[NX2_ID_MAX];
+    int32_t  iMileage, iPlayCount, ikcal, iVO2, iWMPosition;
+    int32_t  m_iRewardCnt, m_iWorldMaxCnt;
+    char     bmUnlock[NX2_SONG_MAX];         /* bit0..4 modo, bit6 música, bit7 revela */
+    char     bmWMClear[NX2_MISSION_MAX];
+    int32_t  bmWMHighScore[NX2_MISSION_MAX];
+    int32_t  iWMChallenge[NX2_MISSION_MAX];
+    char     bWMBarricadeClear[16];
+    char     bWMEventClear[128];
+    char     bWMWarp[8];
+    char     szLand[128];
+    char     szMission[128];
+    struct { int32_t Score; char Name[NX2_ID_MAX]; } Record[NX2_SONG_MAX][5];
+} Nx2Stat;
+typedef struct {                             /* primeiros 292 bytes de nx2save.bin, sem cifra */
+    char    PlayerID[NX2_ID_MAX];
+    int32_t iMileage, m_iRewardCnt, m_iWorldMaxCnt, iPlayCount;
+    char    szLand[128], szMission[128];
+    int32_t ikcal, iVO2;
+} Nx2Review;
+typedef struct { int32_t iGameMode, iPlayOrder, iPlayScore, iGrade, iMileage; float fPlayTime, fKcal, fVO2; } Nx2RankUnit;
+typedef struct { uint32_t CheckSum, nCnt; Nx2RankUnit tRI[128][NX2_MAX_STAGE]; } Nx2RankInfo;
+#pragma pack(pop)
+#pragma pack(push, 1)
+typedef struct {
+    uint32_t _ident;                         /* "NX20" = 0x3032584E */
+    uint32_t _uptime;
+    uint8_t  g_Language;                     /* 0 KR 1 EN 2 ES 3 PT */
+    int32_t  g_PlayCountPerTrack[NX2_SONG_MAX];
+    int32_t  g_DefaultStation;
+    uint8_t  gs_GameMode, gs_GameLevel, gs_StageBreak, gs_DemoSound, gs_ShowHelp, gs_MercyTicket, gs_ScorePerTicket_div_100000;
+    uint8_t  cs_CreditLimit, cs_CreditPerCoin1, cs_CoinPerCredit2;
+    uint32_t bk_Coin1Total, bk_Coin2Total, bk_ServiceTotal;
+    int32_t  g_CreditTotal, g_MileageTotal;
+    int32_t  ticket_output_total[2];
+    char     Region;
+    uint8_t  fCensor[NX2_SONG_MAX];
+    int32_t  usbBus[2];
+    Nx2Stat  m_Stat;                         /* estatísticas locais (sem pendrive) */
+    uint32_t _chksum;
+} Nx2Option;
+#pragma pack(pop)
+#define NX2_RANK_MAX     20
+#define NX2_WORLDSCORE   64
+#define NX2_HIGHSCORE    (NX2_RANK_MAX + NX2_WORLDSCORE)
+#define NX2_MRANK_MAX    10000
+#pragma pack(push, 1)
+typedef struct { int32_t iScore; char szName[4]; } Nx2ScoreElem;
+typedef struct { int32_t _adler32; Nx2ScoreElem m_Scores[NX2_HIGHSCORE]; } Nx2Rank;
+typedef struct { char szName[4]; int32_t iScore; int32_t ScoreType; } Nx2MScoreElem;
+typedef struct { int32_t _adler32; Nx2MScoreElem m_Scores[NX2_MRANK_MAX]; } Nx2MRank;
+#pragma pack(pop)
+
+/* códigos de retorno de Nx2Profile_Load/Save (mesma ordem do CUsbManager) */
+enum { NX2_USB_OK = 0, NX2_USB_NOCONFIG, NX2_USB_NOTINSERTED, NX2_USB_MOUNTERROR, NX2_USB_NODATA, NX2_USB_BADDATA, NX2_USB_CANNOTWRITE };
+extern Nx2Option g_nx2Opt;                   /* PIUNX2.INI em memória */
+extern Nx2Stat   g_nx2Prof[2];               /* perfis (nx2save.bin) em memória */
+extern Nx2RankInfo g_nx2ProfRank[2];         /* nx2rank.bin em memória */
+extern bool      g_nx2HasProfile[2];         /* CUsbManager::HasUsb */
+bool  Nx2Option_Load(void);                  /* false = ausente/inválido (g_nx2Opt fica zerado) */
+bool  Nx2Option_Save(void);
+Nx2Stat* Nx2_Stat(int player);               /* perfil se ativo, senão g_nx2Opt.m_Stat (g_Option.m_Stat) */
+int   Nx2Profile_Load(int player);           /* nx2save.bin + nx2rank.bin */
+int   Nx2Profile_Save(int player);
+int   Nx2Profile_SaveRank(int player, const Nx2RankUnit info[NX2_MAX_STAGE]);
+bool  Nx2Profile_Create(int player, const char* id);   /* extra do port: cria um perfil novo */
+void  Nx2Profile_Unload(int player);
+bool  Nx2Rank_Load(Nx2Rank* r);
+bool  Nx2Rank_Save(const Nx2Rank* r);
+bool  Nx2MRank_Load(Nx2MRank* r);
+bool  Nx2MRank_Save(const Nx2MRank* r);
+
 extern const int g_songChannels[SONG_CHANNEL_COUNT][SONG_CHANNEL_MAX];
 
 typedef enum {
@@ -360,6 +473,7 @@ typedef struct {
     int type;
     int blendMode;
     int z_order;
+    float rotY, rotX;   /* BGA3 +0x24 / +0x28: rotações em Y e X (PEngineBGA.cpp: rot[1], rot[2]) */
 } BGAKeyframe;
 
 typedef struct {
@@ -389,7 +503,7 @@ typedef struct {
     int patFlags;
 } BGALayer;
 
-#define MAX_BGA_SCENES 64   /* NX: COMMON.BGA tem 46 cenas; era 32 */
+#define MAX_BGA_SCENES 256  /* NX2: ARCADE_SPECIAL_C tem >64 cenas (kcal/vo2); NX: COMMON.BGA tem 46; era 64 */
 
 typedef struct {
     char name[64];
@@ -585,6 +699,11 @@ typedef struct {
     bool cmdGradeRev[2];         /* 0x100 RG: só o sprite do julgamento (0x806f856) */
     bool cmdNXMode[2];           /* 0x2000 NX: perspectiva da pista ([0xa7f4a6d]) */
     bool cmdUnderAttack[2];      /* 0x080 UA: pista girada 180 graus (modo 0x13) */
+    bool cmdAppear[2];           /* NX2 0x2 APPEAR (a nota só aparece perto do receptor); NONSTEP = VANISH|APPEAR */
+    bool cmdDrop;                /* NX2 0x4000 UPSIDEDOWN: tela virada na vertical (vale para os dois jogadores) */
+    bool cmdSnake[2];            /* NX2 0x200000 SNAKE: deslocamento horizontal sin(beat*PI)*PUMP_ARROW_Y/2 */
+    bool cmdSink[2];             /* NX2 0x80000 SINK: z = SINK_HEIGHT*sin(y*PI/ORG_Y) */
+    bool cmdRise[2];             /* NX2 0x100000 RISE: igual ao SINK com o sinal invertido */
     int  activePlayerMask; /* 0x1=P1 ativo, 0x2=P2 ativo (ambos=0x3). Default=0x1 */
     bool isBattleMode;    /* true quando BATTLE selecionado (P1+P2, HARD steps em half1 duplicado em half2) */
     bool isVSL;           // true when current song uses 3D VSL instead of BGA
@@ -856,6 +975,9 @@ unsigned Title_GetJoinedMask(void); /* intro.c — [0x568FF4] bits 0/1 */
 void Title_SetJoinedMask(unsigned m);
 void Station_Update(float dt);      /* station.c — CStation do Exceed2 */
 void Station_Render(void);
+void Nx2Station_Enter(void);          /* nx2_station.c — CStation do NX2 (SELECT_STATION.DAT) */
+void Nx2Station_Update(float dt);
+void Nx2Station_Render(void);
 void NxStation_Enter(void);           /* nx_station.c — chamado na troca de estado */
 /* Exceed: songDB sintético montado das tabelas do exceed.exe quando não há
  * Stage.cfg. Com ele, os IDs são hex e os arquivos saem em "%X"

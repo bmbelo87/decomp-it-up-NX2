@@ -2,8 +2,9 @@
 
 # NXReconstructed (Decomp-it-up-New-Xenesis)
 
-A faithful C reconstruction of **Pump It Up NX (New Xenesis)**, based on the Linux arcade
-executable `piu` (ELF i386).
+A faithful C reconstruction of **Pump it Up NX2: Next Xenesis**, based on the Linux arcade
+executable `piu` (ELF i386). (This tree started as the NX reconstruction, *New Xenesis*, and is being
+ported to NX2; sections below that still describe NX are being updated.)
 
 This project reverse-engineers the original binary and reproduces its gameplay, rendering, audio,
 and state machine as closely as possible — no emulation, no wrappers. Native executable for
@@ -51,6 +52,23 @@ Releases: <https://github.com/bmbelo87/decomp-it-up-New-Xenesis/releases> (Windo
 | Mercy ticket / score per ticket / credit limit                   | ⚙️ Saved, not used by the game yet |
 | RESTRICTION page in the Service Menu (per-song on/off, `restrict.dat`) | ✅ Port extra |
 | Internet Ranking                                                 | ❌ Turned off on purpose (code kept in `ir.c`) |
+
+## NX2 port progress (`src/nx2_*.c`)
+
+Being ported on top of the NX tree, checked against the real `piu` ELF (the NX2China C++ source is only a hint).
+
+| Feature (NX2)                                                    | Status |
+| ---------------------------------------------------------------- | ------ |
+| Song table, NX10 chart parser, dongle / AUD, save system (`docs/NX2_SAVE.md`) | ✅ |
+| USB screen, Station Select, Arcade Select (carousel, preview, modes, levels, arrows) | ✅ |
+| Select score panel: nick, score, kcal / VO2 (`MAX_BGA_SCENES` raised to 256) | ✅ |
+| CENTER flow: 1st press selects, 2nd starts, locked song = WRONG, then `RUN` | ✅ |
+| Command codes (queue of 16 keys per player, order of `g_Cmd_1p`) with `CCommandIcon` groups | ✅ |
+| Appear, Drop (code + gameplay)                                   | ✅ Appear confirmed by the user; Drop with NX is a hypothesis |
+| Snake (relative-beat sine, `playengine.cpp:2721`)                | ⚙️ Fixed after the first attempt; still to be checked in play |
+| Sink / Rise                                                      | ⚙️ Codes and icons only, no gameplay effect yet (needs perspective / Z) |
+| Skins, Hard Judge, late join, mileage locks, 2P and Special in Select | ❌ Pending |
+| 5X / 6X / +0.5X                                                  | ❌ Only for the MODDED style |
 
 ## Song Select Controls
 

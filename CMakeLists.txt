@@ -178,7 +178,8 @@ add_executable(Pumpy
     # src/exceed_songs.c   (Exceed: tabelas do exceed.exe)
     # src/exceed2_songs.c   # Exceed2 — desativado
     # src/zero_songs.c     # Zero — desativado
-    src/nx_songs.c
+    # src/nx_songs.c   # NX — desativado (tabela da NX)
+    src/nx2_songs.c
     src/select_classic.c
     src/nx_select.c
     src/service_menu.c
@@ -214,6 +215,11 @@ add_executable(Pumpy
     src/resource.c
     src/dog_table.c
     src/step.c
+    src/step_nx.c
+    src/nx2_save.c
+    src/nx2_usbin.c
+    src/nx2_station.c
+    src/nx2_select.c
     src/song.c
     src/zlibinflate.c
     # src/xbrz.c        # UPSCALE (xBRZ) das texturas — DESATIVADO (30/09/2026)

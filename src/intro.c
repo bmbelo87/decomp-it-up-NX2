@@ -47,7 +47,7 @@ static bool Demo_StartNX(void) {
         for (int p = 0; p < 2; p++) {   /* a demo não herda os comandos do último crédito */
             g_game.cmdVanish[p] = g_game.cmdNonStep[p] = g_game.cmdMirror[p] = g_game.cmdRandomStep[p] = false;
             g_game.cmdEarthworm[p] = g_game.cmdFlash[p] = g_game.cmdFreedom[p] = g_game.cmdGradeRev[p] = false;
-            g_game.cmdDecel[p] = g_game.cmdAccel[p] = g_game.cmdUnderAttack[p] = false;
+            g_game.cmdDecel[p] = g_game.cmdAccel[p] = g_game.cmdUnderAttack[p] = false; g_game.cmdAppear[p] = g_game.cmdSnake[p] = g_game.cmdSink[p] = g_game.cmdRise[p] = false; g_game.cmdDrop = false;
             g_game.cmdXMode[p] = g_game.cmdNXMode[p] = g_game.cmdTestBGA[p] = false;
         }
         g_demoSound = (g_game.svcDemoSound == 0);
@@ -303,7 +303,8 @@ void Gamestate_UpdateIntro(float dt) {
          * vai direto para "STATION" (0x41af1f), sem fade; o CREDIT.MOV e o
          * TITLE.AUD continuam (o CStation desenha o vídeo, 0x419d1f). */
         if (g_titleJoined & 3) {
-            Game_ChangeState(STATE_STATION);
+            /* era: Game_ChangeState(STATE_STATION);  NX2 (flowcontrol.cpp): TITLE -> USB_INPUT -> STATION */
+            Game_ChangeState(STATE_NX_USBIN);
             return;
         }
 #if 0   /* Exceed (exceed.exe): fade de 60 quadros e SELECT — DESATIVADO */

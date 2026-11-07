@@ -33,6 +33,8 @@ static BGAKeyframe lerp_kf(BGAKeyframe* a, BGAKeyframe* b, float t, int picVersi
     else if (a->scaleY == 0.0f) r.scaleY = b->scaleY;
     else if (b->scaleY == 0.0f) r.scaleY = a->scaleY;
     r.rotation = lerp(a->rotation, b->rotation, t);
+    r.rotY = lerp(a->rotY, b->rotY, t);
+    r.rotX = lerp(a->rotX, b->rotX, t);
     r.r = lerp(a->r, b->r, t);
     r.g = lerp(a->g, b->g, t);
     r.b = lerp(a->b, b->b, t);
@@ -146,6 +148,7 @@ static bool parseBGA2(const uint8_t* bgaData, uint32_t bgaSize, BGAPicture* pic)
             kf->scaleX = *(float*)(bgaData + ofs + 0x10);
             kf->scaleY = *(float*)(bgaData + ofs + 0x14);
             kf->rotation = *(float*)(bgaData + ofs + 0x18);
+            kf->rotY = kf->rotX = 0.0f;
             kf->r = *(float*)(bgaData + ofs + 0x1c);
             kf->g = *(float*)(bgaData + ofs + 0x20);
             kf->b = *(float*)(bgaData + ofs + 0x24);
@@ -284,6 +287,7 @@ static bool parseBGA0(const uint8_t* bgaData, uint32_t bgaSize) {
             kf->scaleX = floats[4];
             kf->scaleY = floats[4];
             kf->rotation = floats[5];
+            kf->rotY = kf->rotX = 0.0f;
             kf->r = floats[6];
             kf->g = floats[7];
             kf->b = floats[8];
@@ -370,6 +374,7 @@ static void drawTileQuad(SPRTileDef* tile, float offsetX, float offsetY) {
     glEnd();
 }
 
+static float s_rotY, s_rotX;   /* rotações Y/X da camada em desenho (BGA3: rot[1], rot[2] do PEngineBGA.cpp) */
 static void renderSPTile(SPRTileDef* tile, float posX, float posY, float scaleX, float scaleY, float hotX, float hotY, float rotation, float r, float g, float b, float alpha) {
     bool isHall = tile && strstr(tile->name, "hall.spr");
     if (!tile || tile->texId < 0) {
@@ -415,6 +420,8 @@ static void renderSPTile(SPRTileDef* tile, float posX, float posY, float scaleX,
     glTranslatef(hotX, -hotY, 0.0f);
     if (rotation != 0.0f)
         glRotatef(rotation, 0.0f, 0.0f, 1.0f);
+    if (s_rotY != 0.0f) glRotatef(s_rotY, 0.0f, 1.0f, 0.0f);
+    if (s_rotX != 0.0f) glRotatef(s_rotX, 1.0f, 0.0f, 0.0f);
     glScalef(sx, sy, 1.0f);
     glTranslatef(-hotX, hotY, 0.0f);
     glTranslatef(0.0f, -480.0f, 0.0f);
@@ -514,7 +521,7 @@ static float s_picA[MAX_BGA_PICS];
 static bool  s_picColorSet[MAX_BGA_PICS];
 static float s_slotRGB[3] = { 1.0f, 1.0f, 1.0f }, s_slotA = 1.0f;
 
-static void renderOneLayer(BGALayer* layer, BGAKeyframe* state, int picVersion, float animT) {
+static void renderOneLayer2D(BGALayer* layer, BGAKeyframe* state, int picVersion, float animT) {
     if (!state || state->type == 0 || state->a <= 0.01f) return;
 
     /* Exceed2 BGA3 (PIU32.EXE 0x41e963 + ramo [obj]==3 em 0x41ea4b): o pivô de
@@ -577,6 +584,8 @@ static void renderOneLayer(BGALayer* layer, BGAKeyframe* state, int picVersion, 
             glTranslatef(state->hotx, -state->hoty, 0.0f);
             if (state->rotation != 0.0f)
                 glRotatef(state->rotation, 0.0f, 0.0f, 1.0f);
+            if (s_rotY != 0.0f) glRotatef(s_rotY, 0.0f, 1.0f, 0.0f);
+            if (s_rotX != 0.0f) glRotatef(s_rotX, 1.0f, 0.0f, 0.0f);
             glScalef(sx, sy, 1.0f);
             glTranslatef(-state->hotx, state->hoty, 0.0f);
             glTranslatef(0.0f, -480.0f, 0.0f);
@@ -643,6 +652,8 @@ static void renderOneLayer(BGALayer* layer, BGAKeyframe* state, int picVersion, 
         glTranslatef(state->hotx, -state->hoty, 0.0f);
         if (state->rotation != 0.0f)
             glRotatef(state->rotation, 0.0f, 0.0f, 1.0f);
+    if (s_rotY != 0.0f) glRotatef(s_rotY, 0.0f, 1.0f, 0.0f);
+    if (s_rotX != 0.0f) glRotatef(s_rotX, 1.0f, 0.0f, 0.0f);
         glScalef(sx, sy, 1.0f);
         glTranslatef(-state->hotx, state->hoty, 0.0f);
         glTranslatef(0.0f, -480.0f, 0.0f);
@@ -661,6 +672,30 @@ static void renderOneLayer(BGALayer* layer, BGAKeyframe* state, int picVersion, 
         glEnd();
         glPopMatrix();
         glColor4f(1, 1, 1, 1);
+    }
+}
+
+/* Camadas BGA3 com rotação em Y/X (discos do carrossel da Select): o original desenha sob
+ * S3DSetProjection(43.603) — perspectiva com a câmera a 600 do plano z=0, 1:1 com 640x480 (como em
+ * nameinput.c). Sem rotação 3D o desenho segue na projeção ortográfica de sempre. */
+static void renderOneLayer(BGALayer* layer, BGAKeyframe* state, int picVersion, float animT) {
+    if (state && (state->rotY != 0.0f || state->rotX != 0.0f)) {
+        const float n = 10.0f, f = 4000.0f, k = n / 600.0f;
+        s_rotY = state->rotY; s_rotX = state->rotX;
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glFrustum(-320.0f * k, 320.0f * k, -240.0f * k, 240.0f * k, n, f);
+        glTranslatef(-320.0f, -240.0f, -600.0f);
+        glMatrixMode(GL_MODELVIEW);
+        renderOneLayer2D(layer, state, picVersion, animT);
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+        s_rotY = s_rotX = 0.0f;
+    } else {
+        s_rotY = s_rotX = 0.0f;
+        renderOneLayer2D(layer, state, picVersion, animT);
     }
 }
 
@@ -772,6 +807,18 @@ static BGAScene* bga_findScene(int bgaIndex, const char* name) {
     for (int i = 0; i < pic->sceneCount; i++)
         if (_stricmp(pic->scenes[i].name, name) == 0) return &pic->scenes[i];
     return NULL;
+}
+
+/* extra do port (NX2): cenas por posição. O CSelect do NX2 chama as cenas de nível por índice (m_iLVSingle etc.), contando
+ * a lista sem os separadores "---"; o chamador monta essa lista com estas duas funções. */
+int BGA_SceneCount(int bgaIndex) {
+    if (bgaIndex < 0 || bgaIndex >= g_game.bgaPicCount) return 0;
+    return g_game.bgaPics[bgaIndex].sceneCount;
+}
+const char* BGA_SceneNameAt(int bgaIndex, int i) {
+    if (bgaIndex < 0 || bgaIndex >= g_game.bgaPicCount) return NULL;
+    BGAPicture* pic = &g_game.bgaPics[bgaIndex];
+    return (i >= 0 && i < pic->sceneCount) ? pic->scenes[i].name : NULL;
 }
 
 /* 0x41ece0: todos os slots no quadro (frame < 0 vira 0) */

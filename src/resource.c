@@ -740,6 +740,8 @@ static void bga3_emit(BGALayer* layer, const uint8_t* r, int frameAdd) {
     kf->scaleX = *(const float*)(r + 0x18);
     kf->scaleY = *(const float*)(r + 0x1C);
     kf->rotation = *(const float*)(r + 0x20);   /* eixo Z: hipótese (BGA2 grava a rotação aqui) */
+    kf->rotY = *(const float*)(r + 0x24);       /* PEngineBGA.cpp: S3DRotatef(rot[1], 0,1,0) */
+    kf->rotX = *(const float*)(r + 0x28);       /* S3DRotatef(rot[2], 1,0,0) */
     kf->r = *(const float*)(r + 0x2C);
     kf->g = *(const float*)(r + 0x30);
     kf->b = *(const float*)(r + 0x34);
@@ -908,6 +910,7 @@ static bool loadBGAFromRES(const char* bgaName, int bgaIdx) {
                     kf->scaleX = floats[4];
                     kf->scaleY = floats[5];
                     kf->rotation = floats[6];
+                    kf->rotY = kf->rotX = 0.0f;
                     kf->r = floats[7];
                     kf->g = floats[8];
                     kf->b = floats[9];
@@ -995,6 +998,7 @@ static bool loadBGAFromRES(const char* bgaName, int bgaIdx) {
                 kf->scaleX = floats[4];
                 kf->scaleY = floats[4];
                 kf->rotation = floats[5];
+                kf->rotY = kf->rotX = 0.0f;
                 kf->r = floats[6];
                 kf->g = floats[7];
                 kf->b = floats[8];
@@ -1321,6 +1325,7 @@ bool Resource_LoadBGADirect(const char* datPath) {
                 kf->scaleX = kfData[4];
                 kf->scaleY = kfData[5];
                 kf->rotation = kfData[6];
+                kf->rotY = kf->rotX = 0.0f;
                 kf->r = kfData[7];
                 kf->g = kfData[8];
                 kf->b = kfData[9];
@@ -1340,6 +1345,7 @@ bool Resource_LoadBGADirect(const char* datPath) {
                 kf->scaleX = floats[4];
                 kf->scaleY = floats[4];
                 kf->rotation = floats[5];
+                kf->rotY = kf->rotX = 0.0f;
                 kf->r = floats[6];
                 kf->g = floats[7];
                 kf->b = floats[8];

@@ -494,6 +494,9 @@ void NxCmd_ToGame(void) {
  * ------------------------------------------------------------------------- */
 static void listAdd(int i) {
     const TrackEntry* e = &g_songTable[i];
+    /* NX2 GetEnabledSongList (nx2src songmanager.cpp:755): bCensor e bHidden_play (bShowHidden é sempre
+     * false nas chamadas) ficam fora da lista. As 34 ocultas só voltam com desbloqueio por USB. */
+    if (g_nx2SongExtra[i].censor || g_nx2SongExtra[i].hiddenPlay) return;
     if (special()) {   /* 0x8062566: só canais 4..6 e custo <= corações */
         if (!(e->channel & 4) || heartCost(e) > g_game.nxHearts) return;
     } else if (e->channel & 4) return;

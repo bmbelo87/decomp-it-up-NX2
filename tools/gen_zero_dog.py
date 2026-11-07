@@ -15,7 +15,17 @@ for key in ("nx_dog.key", "zero_dog.key"):
         if q in tab and tab[q] != resp: raise SystemExit("conflito em %s: %s" % (key, q.hex()))
         tab.setdefault(q, resp)
     print(key, "->", len(tab), "entradas acumuladas")
-out = ["/* Gerado por tools/gen_zero_dog.py (nx_dog.key + zero_dog.key) — nao editar. */",
+# NX2: pares consulta->resposta recuperados dos proprios arquivos (tools/gen_nx2_dog.py), sem o dongle.
+nx2 = os.path.join(here, "data", "nx2_dog.txt")
+if os.path.exists(nx2):
+    for ln in open(nx2, encoding="ascii"):
+        ln = ln.split("#")[0].split()
+        if len(ln) != 2: continue
+        q, resp = bytes.fromhex(ln[0]), int(ln[1], 16)
+        if q in tab and tab[q] != resp: raise SystemExit("conflito em nx2_dog.txt: %s" % q.hex())
+        tab.setdefault(q, resp)
+    print("nx2_dog.txt ->", len(tab), "entradas acumuladas")
+out = ["/* Gerado por tools/gen_zero_dog.py (nx_dog.key + zero_dog.key + nx2_dog.txt) — nao editar. */",
        "/* Respostas do MicroDog 3.4 (servico Convert, piu 0x80a6058) para consultas de 16 bytes. */",
        "#include <stdint.h>", "#include <string.h>", "#include <stdlib.h>", "",
        "typedef struct { uint8_t q[16]; uint32_t r; } DogEntry;", "",

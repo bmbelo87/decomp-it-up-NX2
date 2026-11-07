@@ -17,12 +17,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName",      "Decomp It Up Team"
-            VALUE "FileDescription",  "Decomp It Up: New Xenesis"
+            VALUE "FileDescription",  "Pump it Up NX2: Next Xenesis"   /* era: "Decomp It Up: New Xenesis" */
             VALUE "FileVersion",      "1.0.0.0"
             VALUE "InternalName",     "Pumpy"
             VALUE "LegalCopyright",   "Copyright (C) 2006 Andamiro / Decomp Team"
             VALUE "OriginalFilename", "Pumpy.exe"
-            VALUE "ProductName",      "Decomp It Up: New Xenesis"
+            VALUE "ProductName",      "Pump it Up NX2: Next Xenesis"   /* era: "Decomp It Up: New Xenesis" */
             VALUE "ProductVersion",   "1.0.0.0"
         END
     END

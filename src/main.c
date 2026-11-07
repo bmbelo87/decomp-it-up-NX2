@@ -50,9 +50,11 @@ static void LoadBGAForState(GameState state) {
     case STATE_WARNING_INIT:
     case STATE_WARNING_ANIM: bgaName = "R_WARN"; break;   /* Exceed2: BGA\R_WARN.DAT (PIU32.EXE); Exceed usava R_WARN_A */
     case STATE_INTRO:        bgaName = ""; break;       /* vídeo, sem BGA */
-    case STATE_CREDIT:       bgaName = "82"; break;
+    /* era: case STATE_CREDIT: bgaName = "82"; break;   — NX2 não tem 82.DAT (title.cpp só carrega COMMON.DAT) */
+    case STATE_CREDIT:       bgaName = ""; break;
     case STATE_NAMEINPUT:    bgaName = "085"; break;    /* CNameInput 0x414012: BGA\085.DAT */
     case STATE_IR:           bgaName = "IR"; break;     /* CInternetRanking 0x41371B: BGA\IR.DAT */
+    case STATE_NX_USBIN:     bgaName = NULL; break;     /* NX2: carrega as próprias BGAs (nx2_usbin.c) */
     case STATE_STATION:      bgaName = NULL; break;     /* NX: usa o COMMON/ARRO que a CTitle deixou (era: "" + STATION.DAT) */
     case STATE_HIGHSCORE:    bgaName = "HIGHSCORE"; break;   /* era "HS" (Exceed); NX: BGA/HIGHSCORE.DAT */     /* CHighscore 0x4126E7: BGA\HS.DAT */     /* CTitle::Begin 0x41C04A: BGA\82.DAT sobre o CREDIT.MOV */
     case STATE_LOGO_ENTER:   bgaName = "81"; break;
@@ -115,12 +117,15 @@ static void LoadBGAForState(GameState state) {
     if (state == STATE_SELECT) {
         BGM_Stop();
         /* ClassicSelect_Enter(); */    /* Zero: CSelect (select_classic.c) */
-        NxSelect_Enter();            /* NX: CSelect (nx_select.c) */
+        /* NX2: Arcade/Special = CSelect do NX2 (nx2_select.c); WorldMax/Training ainda na da NX (nx_select.c) */
+        if (g_game.nxGameMode == 0 || g_game.nxGameMode == 1) Nx2Select_Enter();
+        else NxSelect_Enter();       /* NX: CSelect (nx_select.c) */
         /* Select_Enter(); */      /* Exceed2 */
     }
 
     /* NX CStation: Begin no próprio quadro da troca (sem quadro preto entre Title e Station) */
-    if (state == STATE_STATION) NxStation_Enter();
+    /* era (NX): if (state == STATE_STATION) NxStation_Enter();  NX2: CStation com SELECT_STATION.DAT (nx2_station.c) */
+    if (state == STATE_STATION) Nx2Station_Enter();
 
     if (state == STATE_MENU_ENTER) {
         char path[MAX_PATH];
@@ -172,7 +177,7 @@ void Game_ResetAllCheats(void) {
         g_game.cmdTestBGA[_p]        = false;
         g_game.cmdXMode[_p] = g_game.cmdAccel[_p] = g_game.cmdDecel[_p] = false;
         g_game.cmdFlash[_p] = g_game.cmdGradeRev[_p] = false;
-        g_game.cmdNXMode[_p] = g_game.cmdUnderAttack[_p] = false;
+        g_game.cmdNXMode[_p] = g_game.cmdUnderAttack[_p] = false; g_game.cmdAppear[_p] = g_game.cmdSnake[_p] = g_game.cmdSink[_p] = g_game.cmdRise[_p] = false; g_game.cmdDrop = false;
     }
     Log_Print("CHEATS: reset global (ESC/GameOver)\n");
 }
@@ -315,7 +320,10 @@ void Game_Init(HINSTANCE hInstance) {
             /* era (Zero): "%s/%s.STX" */
             snprintf(stxPath, sizeof(stxPath), "%s/%s.SEE", stepDir, Song_DataIdStr(e->id));
             FILE* test = fopen(stxPath, "rb");
+            char nxDir[MAX_PATH];   /* NX2: STEP/<id>/*.NX */
+            snprintf(nxDir, sizeof(nxDir), "%s/%s", stepDir, Song_DataIdStr(e->id));
             if (test) { fclose(test); e->hasChart = true; }
+            else if (Step_NXExists(nxDir)) e->hasChart = true;
             else {
                 /* Exceed2: .STX dentro de STEP.DAT (PIU32.EXE 0x40d0d7) */
                 char datPath[MAX_PATH], stxName[64];
@@ -351,6 +359,8 @@ void Game_Init(HINSTANCE hInstance) {
         const char* as = getenv("PUMPY_AUTOSTATE");
         if (as && _stricmp(as, "SELECT") == 0) { Menu_ResetState(); Game_ChangeState(STATE_SELECT); }
         if (as && _stricmp(as, "STATION") == 0) Game_ChangeState(STATE_STATION);
+        /* NX2 (teste): PUMPY_AUTOSTATE=USBIN abre direto a entrada do perfil com os dois jogadores */
+        if (as && _stricmp(as, "USBIN") == 0) { Title_SetJoinedMask(3); Game_ChangeState(STATE_NX_USBIN); }
         if (as && _stricmp(as, "HIGHSCORE") == 0) Game_ChangeState(STATE_HIGHSCORE);   /* teste da tela de ranking */
         /* PUMPY_AUTOSTATE=NXTEST: D02 NORMAL em autoplay (demo) com NX Mode, para testes */
         /* PUMPY_AUTOSTATE=RUN + PUMPY_TEST_ID=<hex> [+ PUMPY_TEST_MODE=0..4]: abre direto
@@ -596,11 +606,13 @@ void Game_Update(float dt) {
         break;
     case STATE_SELECT:
         /* ClassicSelect_Update(dt); */
-        NxSelect_Update(dt);
+        if (g_game.nxGameMode == 0 || g_game.nxGameMode == 1) Nx2Select_Update(dt);
+        else NxSelect_Update(dt);
         /* Select_Update(dt); */
         break;
     case STATE_STATION:
-        Station_Update(dt);
+        /* era (NX): Station_Update(dt); */
+        Nx2Station_Update(dt);
         break;
     case STATE_MENU_ENTER:
     case STATE_MENU_INPUT:
@@ -619,6 +631,9 @@ void Game_Update(float dt) {
         break;
     case STATE_NX_SPORTS:
         NxSports_Update(dt);
+        break;
+    case STATE_NX_USBIN:
+        NxUsbIn_Update(dt);
         break;
     case STATE_NX_CLEAR:
         if (g_game.stateFrame == 1) NxClear_Enter();
@@ -1016,6 +1031,7 @@ void Game_Render(void) {
         g_game.state != STATE_NX_MISSION &&     /* objetivo da missão desenha por cena (nx_mission.c) */
         g_game.state != STATE_NX_CLEAR &&
         g_game.state != STATE_NX_SPORTS &&       /* SPORTS desenha por cena (nx_sports.c) */
+        g_game.state != STATE_NX_USBIN &&        /* USBIN desenha por cena (nx2_usbin.c) */
         g_game.state != STATE_HIGHSCORE &&
         g_game.state != STATE_IR &&
         g_game.state != STATE_NAMEINPUT) {      /* NAMEINPUT desenha por slot (nameinput.c) */             /* IR desenha o próprio BGA (ir.c) */      /* HIGHSCORE desenha por slot (highscore.c) */       /* EXSELECT desenha por slot (select_core.c) */
@@ -1038,11 +1054,13 @@ void Game_Render(void) {
             break;
         case STATE_SELECT:
             /* ClassicSelect_Render(); */
-            NxSelect_Render();
+            if (g_game.nxGameMode == 0 || g_game.nxGameMode == 1) Nx2Select_Render();
+            else NxSelect_Render();
             /* Select_Render(); */
             break;
         case STATE_STATION:
-            Station_Render();
+            /* era (NX): Station_Render(); */
+            Nx2Station_Render();
             break;
         case STATE_MENU_ENTER:
         case STATE_MENU_INPUT:
@@ -1065,6 +1083,9 @@ void Game_Render(void) {
         break;
     case STATE_NX_SPORTS:
         NxSports_Render();
+        break;
+    case STATE_NX_USBIN:
+        NxUsbIn_Render();
         break;
     case STATE_GAMEPLAY:
         if (Movie_IsOpen() && !g_game.cmdTestBGA[0] && !g_game.cmdTestBGA[1])

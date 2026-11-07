@@ -165,8 +165,39 @@ static void eepDefaults(void) {
     eepStamp();
 }
 
-static void eepPath(char* out, size_t n) {
-    snprintf(out, n, "%s/SETTINGS/PIUNX.INI", g_game.currentDirectory);
+/* era (NX): static void eepPath(...) { "%s/SETTINGS/PIUNX.INI" }. NX2: save/PIUNX2.INI (nx2_save.c, struct option). */
+
+/* g_eep (imagem interna da NX, offsets usados pelo resto do código) <-> g_nx2Opt (PIUNX2.INI).
+ * Só os campos com equivalente direto; o resto de g_nx2Opt (estatísticas locais, censura, região...) é
+ * preservado ao regravar. Os créditos em andamento (O_CREDITS/O_COINS) não existem no NX2: não persistem.
+ * _chksum/_ident do INI são recalculados por Nx2Option_Save. */
+static void eepFromOption(void) {
+    const Nx2Option* o = &g_nx2Opt;
+    g_eep[O_LANG] = o->g_Language;
+    for (int i = 0; i < 200; i++) eepPut32(O_STATS + 4 * i, (uint32_t)o->g_PlayCountPerTrack[i]);
+    eepPut32(O_STATION, (uint32_t)o->g_DefaultStation);
+    g_eep[O_MODE] = o->gs_GameMode;       g_eep[O_LEVEL] = o->gs_GameLevel;     g_eep[O_STAGEBRK] = o->gs_StageBreak;
+    g_eep[O_DEMO] = o->gs_DemoSound;      g_eep[O_HELP] = o->gs_ShowHelp;       g_eep[O_MERCY] = o->gs_MercyTicket;
+    g_eep[O_SCORETKT] = o->gs_ScorePerTicket_div_100000;
+    g_eep[O_CREDLIMIT] = o->cs_CreditLimit; g_eep[O_COIN1] = o->cs_CreditPerCoin1; g_eep[O_COIN2] = o->cs_CoinPerCredit2;
+    eepPut32(O_COIN1TOT, o->bk_Coin1Total); eepPut32(O_COIN2TOT, o->bk_Coin2Total); eepPut32(O_SVCTOT, o->bk_ServiceTotal);
+    eepPut32(O_TICKET1, (uint32_t)o->ticket_output_total[0]); eepPut32(O_TICKET2, (uint32_t)o->ticket_output_total[1]);
+    eepPut32(EEP_TIME, o->_uptime);
+    eepPut32(O_CREDITS, 0); eepPut32(O_COINS, 0);
+}
+
+static void eepToOption(void) {
+    Nx2Option* o = &g_nx2Opt;
+    o->g_Language = g_eep[O_LANG];
+    for (int i = 0; i < 200; i++) o->g_PlayCountPerTrack[i] = (int32_t)eepGet32(O_STATS + 4 * i);
+    o->g_DefaultStation = (int32_t)eepGet32(O_STATION);
+    o->gs_GameMode = g_eep[O_MODE];       o->gs_GameLevel = g_eep[O_LEVEL];     o->gs_StageBreak = g_eep[O_STAGEBRK];
+    o->gs_DemoSound = g_eep[O_DEMO];      o->gs_ShowHelp = g_eep[O_HELP];       o->gs_MercyTicket = g_eep[O_MERCY];
+    o->gs_ScorePerTicket_div_100000 = g_eep[O_SCORETKT];
+    o->cs_CreditLimit = g_eep[O_CREDLIMIT]; o->cs_CreditPerCoin1 = g_eep[O_COIN1]; o->cs_CoinPerCredit2 = g_eep[O_COIN2];
+    o->bk_Coin1Total = eepGet32(O_COIN1TOT); o->bk_Coin2Total = eepGet32(O_COIN2TOT); o->bk_ServiceTotal = eepGet32(O_SVCTOT);
+    o->ticket_output_total[0] = (int32_t)eepGet32(O_TICKET1); o->ticket_output_total[1] = (int32_t)eepGet32(O_TICKET2);
+    o->_uptime = eepGet32(EEP_TIME);
 }
 
 static void eepToGame(void) {
@@ -213,16 +244,10 @@ void Eeprom_Save(void) {
     uint32_t now = timeGetTime();
     if (g_eepTime) eepPut32(EEP_TIME, eepGet32(EEP_TIME) + (now - g_eepTime));
     g_eepTime = now;
-    snprintf(dir, sizeof(dir), "%s/SETTINGS", g_game.currentDirectory);
-    _mkdir(dir);
-    eepPath(path, sizeof(path));
-    FILE* f = fopen(path, "wb");
-    if (!f) {
-        Log_Print("EEPROM: cannot write '%s'\n", path);
-        return;
-    }
-    fwrite(g_eep, 1, sizeof(g_eep), f);
-    fclose(f);
+    /* era (NX): fopen("<jogo>/SETTINGS/PIUNX.INI") + fwrite(g_eep, 0x1000). NX2: PIUNX2.INI */
+    (void)dir; (void)path;
+    eepToOption();
+    if (!Nx2Option_Save()) Log_Print("EEPROM: cannot write PIUNX2.INI\n");
 }
 
 #if 0   /* DESATIVADO (08/10/2026): migração do pumpprex3.ini; só PIUNX.INI é usado. */
@@ -261,33 +286,22 @@ static bool eepImportOld(void) {
  * Retorno: 1 = arquivo válido; 0 = inválido (resetado e regravado, como o original);
  *          -1 = ausente (padrão; já gravado). */
 int Eeprom_Load(void) {
-    char path[MAX_PATH];
-    eepPath(path, sizeof(path));
-    Log_Print("EEPROM: loading %s\n", path);
+    /* era (NX): fopen("<jogo>/SETTINGS/PIUNX.INI") + fread(g_eep, 0x1000) + conferência de "NX10"/Adler.
+     * NX2: save/PIUNX2.INI ("NX20", Adler de _ident a _chksum), nx2_save.c */
+    Log_Print("EEPROM: loading %s/save/PIUNX2.INI\n", g_game.currentDirectory);
     g_eepTime = timeGetTime();
-
-    FILE* f = fopen(path, "rb");
-    if (!f) {                       /* 0x8061aa5: padrão e grava */
-        eepDefaults();
-        eepToGame();
-        /* eepImportOld(); */
-        Eeprom_Save();
-        return -1;
-    }
-    size_t got = fread(g_eep, 1, sizeof(g_eep), f);
-    fclose(f);
 
     bool dirty = false;
     int ret = 1;
-    if (got != sizeof(g_eep) || eepGet32(EEP_IDENT) != EEP_IDENT_VAL) {
-        Log_Print("Warning - SAVE DATA VERSION IS NOT MATCH\n");
+    if (!Nx2Option_Load()) {        /* ausente ou inválido: padrão e grava */
         eepDefaults();
-        dirty = true; ret = 0;
-    } else if (eepGet32(EEP_CHKSUM) != eepAdler32(&g_eep[EEP_SETTINGS], EEP_SETLEN)) {
-        Log_Print("Warning - Save Data chksum error\n");
-        eepDefaults();
-        dirty = true; ret = 0;
+        g_nx2Opt.Region = (char)0xFF;   /* valor do INI de referência */
+        eepToGame();
+        Eeprom_Save();
+        return -1;
     }
+    eepFromOption();
+    eepStamp();
     if (g_eep[O_SONGS] == 0xFF) {   /* 0x8061a86 */
         memset(&g_eep[O_SONGS], 0, SONG_COUNT);
         dirty = true;

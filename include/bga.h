@@ -21,6 +21,8 @@ void BGA_ScenePlay(int bgaIndex, const char* name, bool draw);   /* 0x41f0f0 */
 bool BGA_SceneDone(int bgaIndex, const char* name);              /* 0x41f2e0 */
 void BGA_SceneReset(int bgaIndex, const char* name);             /* 0x41f390 */
 int  BGA_SceneFrame(int bgaIndex, const char* name);             /* [+0x13a30], -1 sem cena */
+int  BGA_SceneCount(int bgaIndex);                                 /* extra do port: nº de cenas (com os separadores) */
+const char* BGA_SceneNameAt(int bgaIndex, int i);                  /* extra do port: nome da cena i */
 int  BGA_SceneOffset(int bgaIndex, const char* name);            /* Zero 0x80a1a00 */
 void BGA_SceneSetOffset(int bgaIndex, const char* name, int n);  /* Zero 0x80a1ac0 */
 void BGA_SceneFinish(int bgaIndex, const char* name);            /* extra do port: cena no último quadro */
