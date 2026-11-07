@@ -383,7 +383,7 @@ void Game_Init(HINSTANCE hInstance) {
             Menu_ResetState();
             for (int i = 0; i < SONG_TABLE_COUNT; i++)
                 if (g_songTable[i].id && g_songTable[i].level[0] >= 0 && g_songTable[i].level[1] >= 0 && !(g_songTable[i].channel & 4)) {
-                    g_nxDiffIdx[0] = 0; g_nxDiffIdx[1] = 1;
+                    g_nxDiffIdx[0] = 0; g_nxDiffIdx[1] = getenv("PUMPY_TEST_MODE") ? atoi(getenv("PUMPY_TEST_MODE")) : 1;   /* teste: PUMPY_TEST_MODE = dificuldade do P2 */
                     if (Select_StartSong((int)g_songTable[i].id, 0, 3, sp, rv)) break;
                 }
         }

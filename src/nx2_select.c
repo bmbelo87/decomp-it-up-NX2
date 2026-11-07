@@ -266,11 +266,16 @@ static void setBoardCH(bool force)
 }
 
 /* ---- Begin ------------------------------------------------------------------------------------ */
+/* volta da Select depois de um estágio: o cursor (e as dificuldades) ficam na música jogada, como nas outras Pumps */
+static int  s_lastId = -1, s_lastMode[2];
+static bool s_lastSpecial;
+
 void Nx2Select_Enter(void)
 {
     s_special = (g_game.nxGameMode == 1);
     s_active = Title_GetJoinedMask() & 3;
     if (!s_active) s_active = 1;
+    if (getenv("PUMPY_JOIN")) s_active = atoi(getenv("PUMPY_JOIN")) & 3;   /* teste: força os jogadores da Select */
     Title_StopMusic();
     BGM_Stop();
     Movie_Select(1); Movie_Close(); Movie_Select(0);
@@ -359,6 +364,8 @@ void Nx2Select_Enter(void)
 
     /* música inicial: 0xE13 (Arcade sem perfil) / 0xE01 (com perfil) / a primeira (Special) */
     int ss = s_special ? 0 : ((g_nx2HasProfile[0] || g_nx2HasProfile[1]) ? 0xE01 : 0xE13);
+    bool keepLast = (g_game.stageCount != 3 && g_game.svcGameMode != 1 && s_lastId >= 0 && s_lastSpecial == (bool)s_special);
+    if (keepLast) ss = s_lastId;   /* 2º/3º estágio: última música jogada */
     s_cur = 0;
     for (int i = 0; i < s_count; i++) if ((int)g_songTable[s_list[i]].id == ss) { s_cur = i; break; }
     s_selected = s_end = s_endStarted = false; s_endCnt = 0;
@@ -374,6 +381,8 @@ void Nx2Select_Enter(void)
         reorganize(SM_IN);
         setBoardCH(true);
         s_mode[0] = s_mode[1] = s_userMode[0] = s_userMode[1] = 0;      /* MODE_NORMAL */
+        if (keepLast) { s_mode[0] = s_userMode[0] = s_lastMode[0]; s_mode[1] = s_userMode[1] = s_lastMode[1]; }   /* validateMode ajusta se não existir */
+        if (getenv("PUMPY_P2MODE")) { s_mode[1] = s_userMode[1] = atoi(getenv("PUMPY_P2MODE")); }   /* teste: dificuldade do P2 */
         validateMode();
         setExerciseInfo();
         BGA_SceneReset(UA, s_special ? "special_inter_a" : "arcade_intro_a");
@@ -910,6 +919,7 @@ static void launch(void)
     Log_Print("NX2SELECT: RUN %X %s %s" "%c", (unsigned)e->id, k_arg[s_mode[0]], twoPlayers() ? k_arg[s_mode[1]] : "", 10);
     int speed[2] = { 1, 1 };
     bool rv[2] = { false, false };
+    s_lastId = (int)e->id; s_lastSpecial = s_special; s_lastMode[0] = s_mode[0]; s_lastMode[1] = s_mode[1];
     if (g_nx2Opt.g_PlayCountPerTrack[s_list[s_cur]] < 0x7FFFFFFF) g_nx2Opt.g_PlayCountPerTrack[s_list[s_cur]]++;
     Render_SetGlobalColor(0, 0, 0, 0);
     commandsToGame(speed, rv);

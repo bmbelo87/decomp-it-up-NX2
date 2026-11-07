@@ -1304,7 +1304,8 @@ static void nxBuildP2Ctx(void)
     int d0 = g_nxDiffIdx[0], d1 = g_nxDiffIdx[1];
     ctxFree();
     if (!g_hexSongIds || d0 == d1 || d1 < 0 || d1 > 2) return;
-    int ci = Step_SelectChart(k_name[d1], -1);
+    /* era: int ci = Step_SelectChart(k_name[d1], -1);  (devolve a SEÇÃO do .SEE, não o índice: no NX2 a seção 4 caía num chart de 10 colunas) */
+    int ci = Step_SelectChartInSong(&g_playSong, k_name[d1], -1);
     if (ci < 0 || ci >= g_playSong.chartCount || ci == g_chartIdx) return;
     StepChart* c2 = &g_playSong.charts[ci];
     if (!c2->rows || c2->rowCount == 0 || c2->segmentCount == 0) {
