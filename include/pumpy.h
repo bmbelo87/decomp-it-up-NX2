@@ -697,6 +697,7 @@ typedef struct {
     bool cmdDecel[2];            /* 0x200 DC (0x806f079) */
     bool cmdFlash[2];            /* 0x004 FL (0x806cf97 / 0x806f4d5) */
     bool cmdGradeRev[2];         /* 0x100 RG: só o sprite do julgamento (0x806f856) */
+    bool cmdHard[2];             /* NX2 0x400000 HARD JUDGE: PERFECT fixo em 3 px (player.cpp:195) */
     bool cmdNXMode[2];           /* 0x2000 NX: perspectiva da pista ([0xa7f4a6d]) */
     bool cmdUnderAttack[2];      /* 0x080 UA: pista girada 180 graus (modo 0x13) */
     bool cmdAppear[2];           /* NX2 0x2 APPEAR (a nota só aparece perto do receptor); NONSTEP = VANISH|APPEAR */

@@ -690,18 +690,19 @@ static void changeMode(int p, PadButton b, int dir)       /* BN_7 = anterior, BN
 /* ---- códigos de comando (g_Cmd_1p/2p + Select_ProcessCommand + CCommandIcon, select.cpp / commandIcon.cpp) ----------
  * Fila de 16 botões por jogador (cmdqueue.cpp): compara o final da fila com cada código na ordem da tabela; o 1º que casa limpa a fila.
  * Teclas: UL=7 UR=9 DL=1 DR=3 C=5. Não portados: skins, SNAKE, HARD JUDGE, APPEAR, DROP, SINK/RISE, +0.5X (sem campo no jogo). */
-enum { CM_SINK, CM_RISE, CM_UA, CM_NX, CM_SNAKE, CM_GRADEREV, CM_RV, CM_RS, CM_XMODE, CM_EW, CM_FREEDOM, CM_ACCEL, CM_DECEL, CM_MIRROR, CM_FLASH, CM_DROP, CM_APPEAR,
+enum { CM_SINK, CM_RISE, CM_UA, CM_NX, CM_SNAKE, CM_GRADEREV, CM_RV, CM_RS, CM_XMODE, CM_EW, CM_FREEDOM, CM_ACCEL, CM_DECEL, CM_MIRROR, CM_FLASH, CM_DROP, CM_APPEAR, CM_HARDJ,
        CM_SPEEDUP, CM_SPEEDDOWN, CM_VANISH, CM_CANCEL, CM_COUNT };
 static const char* const k_cmdKeys[CM_COUNT] = {
     "771133995", "117799335", "15151595", "1753917539", "9753197531", "79513315975", "797979795", "797913135", "191937375", "319739175", "719337915", "113377995",
-    "331199775", "319731975", "173193795", "719371933", "157359795", "79795", "97975", "79135", "131313" };
+    "331199775", "319731975", "173193795", "719371933", "157359795", "71593717931",
+    "79795", "97975", "79135", "131313" };
 /* LAYER_* da BGA USER_COMMAND (commandLayer.h) */
 enum { LY_2X = 15, LY_3X, LY_4X, LY_8X, LY_AC, LY_DC, LY_EW, LY_RV, LY_V = 24, LY_NS, LY_FD, LY_FL, LY_EXCEED = 38, LY_NX, LY_MIRROR, LY_UA,
-       LY_RS = 43, LY_RG, LY_1X = 47, LY_DROP = 69, LY_SNAKE, LY_APPEAR, LY_SINK, LY_RISE };
+       LY_RS = 43, LY_RG, LY_1X = 47, LY_HG = 63, LY_DROP = 69, LY_SNAKE, LY_APPEAR, LY_SINK, LY_RISE };
 static char    s_cq[2][16];
 static int     s_cspd[2] = { 1, 1 };                       /* 1,2,3,4,8 */
 static int     s_cspec[2];                                 /* 0, 1 = RV, 2 = EW */
-static bool    s_cflag[2][11];                             /* 0 accel 1 decel 2 mirror 3 randomstep 4 flash 5 freedom 6 gradeRev 7 xmode(global) 8 snake 9 sink 10 rise */
+static bool    s_cflag[2][12];                             /* 0 accel 1 decel 2 mirror 3 randomstep 4 flash 5 freedom 6 gradeRev 7 xmode(global) 8 snake 9 sink 10 rise 11 hardjudge */
 static int     s_cvan[2];                                  /* 0, 1 = vanish, 2 = nonstep (V|A), 3 = appear */
 static bool    s_cua, s_cnx, s_cdrop;                               /* globais (os dois jogadores) */
 typedef struct { int max; BGALayerSrc spr[5]; bool has[5]; int count, cur; uint32_t t0; } CmdIcon;
@@ -798,6 +799,7 @@ static void processCommand(int p, int cm)
         s_cflag[p][2] = s_cflag[p][3] = false; s_cflag[p][a] = on;
         iconSet(3, p, on ? (a == 2 ? LY_MIRROR : LY_RS) : -1, 1);
         break; }
+    case CM_HARDJ: s_cflag[p][11] = !s_cflag[p][11]; iconSet(4, p, s_cflag[p][11] ? LY_HG : -1, 3); break;
     case CM_GRADEREV: s_cflag[p][6] = !s_cflag[p][6]; iconSet(4, p, s_cflag[p][6] ? LY_RG : -1, 1); break;
     case CM_XMODE:
         s_cflag[0][7] = s_cflag[1][7] = !s_cflag[p][7];
@@ -841,6 +843,7 @@ static void cmdSessionInit(void)
             if (s_cflag[p][7]) iconSet(3, p, LY_EXCEED, 0);
             if (s_cua) iconSet(3, p, LY_UA, 2);
             if (s_cflag[p][6]) iconSet(4, p, LY_RG, 1);
+            if (s_cflag[p][11]) iconSet(4, p, LY_HG, 3);
             if (s_cnx) iconSet(4, p, LY_NX, 0);
         }
     }
@@ -877,7 +880,7 @@ static void commandsToGame(int speed[2], bool rv[2])
         g_game.cmdAccel[p] = s_cflag[p][0]; g_game.cmdDecel[p] = s_cflag[p][1];
         g_game.cmdMirror[p] = s_cflag[p][2]; g_game.cmdRandomStep[p] = s_cflag[p][3];
         g_game.cmdFlash[p] = s_cflag[p][4]; g_game.cmdFreedom[p] = s_cflag[p][5];
-        g_game.cmdGradeRev[p] = s_cflag[p][6]; g_game.cmdXMode[p] = s_cflag[p][7];
+        g_game.cmdHard[p] = s_cflag[p][11]; g_game.cmdGradeRev[p] = s_cflag[p][6]; g_game.cmdXMode[p] = s_cflag[p][7];
         g_game.cmdVanish[p] = (s_cvan[p] == 1); g_game.cmdNonStep[p] = (s_cvan[p] == 2); g_game.cmdAppear[p] = (s_cvan[p] == 3);
         g_game.cmdSnake[p] = s_cflag[p][8]; g_game.cmdSink[p] = s_cflag[p][9]; g_game.cmdRise[p] = s_cflag[p][10];
         g_game.cmdUnderAttack[p] = s_cua; g_game.cmdNXMode[p] = s_cnx;

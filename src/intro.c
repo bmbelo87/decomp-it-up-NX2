@@ -46,7 +46,7 @@ static bool Demo_StartNX(void) {
         if (m < 0) continue;
         for (int p = 0; p < 2; p++) {   /* a demo não herda os comandos do último crédito */
             g_game.cmdVanish[p] = g_game.cmdNonStep[p] = g_game.cmdMirror[p] = g_game.cmdRandomStep[p] = false;
-            g_game.cmdEarthworm[p] = g_game.cmdFlash[p] = g_game.cmdFreedom[p] = g_game.cmdGradeRev[p] = false;
+            g_game.cmdEarthworm[p] = g_game.cmdFlash[p] = g_game.cmdFreedom[p] = g_game.cmdGradeRev[p] = g_game.cmdHard[p] = false;
             g_game.cmdDecel[p] = g_game.cmdAccel[p] = g_game.cmdUnderAttack[p] = false; g_game.cmdAppear[p] = g_game.cmdSnake[p] = g_game.cmdSink[p] = g_game.cmdRise[p] = false; g_game.cmdDrop = false;
             g_game.cmdXMode[p] = g_game.cmdNXMode[p] = g_game.cmdTestBGA[p] = false;
         }

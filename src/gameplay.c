@@ -65,6 +65,14 @@ static const int k_unitLate [3][4] = { {12,17,22,27}, {10,15,20,25}, { 8,13,18,2
  * Y avança a BPM_atual*60/60 unidades por segundo -> segundos = zona / BPM_atual. */
 static const int k_altUnitEarly[4] = { 8, 13, 18, 23 };
 static const int k_altUnitLate [4] = { 7, 12, 17, 22 };
+/* jogador do julgamento em curso (Hard Judge é por jogador, player.cpp:195) */
+static int g_jp = 0;
+static int judgeLvl(void)
+{
+    int l = g_game.optionDifficulty;
+    if (g_hexSongIds && g_game.cmdHard[g_jp & 1]) l = 2;
+    return l < 0 ? 0 : (l > 2 ? 2 : l);
+}
 static double judgeBpm0(void); /* BPM do 1º bloco do chart (definido após g_chart) */
 
 static void judgeWindows(int lvl, double bpm, double early[4], double late[4])
@@ -1468,6 +1476,7 @@ static bool loadChartForSong(int songId, int diffTier, const char* modeName)
 
     g_baseBeatSplit = g_chart->segments[0].beatSplit;
     g_baseBpm = g_chart->segments[0].bpm;
+            g_game.cmdHard[0]           = g_game.cmdHard[1];
 
     // Pre-compute normalized visual rows (BPM-based, ignoring beatSplit)
     g_visualRowCount = (int)g_chart->rowCount;
@@ -1554,9 +1563,7 @@ static void badLimits(double* early, double* late)
 {
     static double cacheTime = -1e30, cacheE, cacheL;
     static int cacheLvl = -1;
-    int lvl = g_game.optionDifficulty;
-    if (lvl < 0) lvl = 0;
-    if (lvl > 2) lvl = 2;
+    int lvl = judgeLvl();
     if (g_songTime != cacheTime || lvl != cacheLvl) {
         double e[4], l[4];
         judgeWindows(lvl, currentJudgeBpm(), e, l);
@@ -1571,9 +1578,7 @@ static double judgeBadLate(void)  { double e, l; badLimits(&e, &l); return l; }
 static JudgeType evaluateTiming(double diff)
 {
     /* diff < 0: pressionou cedo; diff > 0: pressionou tarde */
-    int lvl = g_game.optionDifficulty;
-    if (lvl < 0) lvl = 0;
-    if (lvl > 2) lvl = 2;
+    int lvl = judgeLvl();
     double e[4], l[4];
     judgeWindows(lvl, currentJudgeBpm(), e, l);
     if (diff > -e[0] && diff < l[0]) return JT_PERFECT;
@@ -2001,7 +2006,7 @@ static JudgeType rowResult(int p, int ri)
 {
     if (!g_zCnt[p] || !g_zCnt[p][ri]) return (JudgeType)g_zRowJ[p][ri];
     if (!g_hexSongIds) return (JudgeType)g_zRowJ[p][ri];   /* outras versões: pior resultado */
-    int lvl = g_game.optionDifficulty < 0 ? 0 : (g_game.optionDifficulty > 2 ? 2 : g_game.optionDifficulty);
+    int lvl = judgeLvl();
     float P = (float)(7 - lvl * 2) / 120.0f * 1000.0f, I = 41.6666679f;   /* 0x8070fd0 */
     float v = g_zSum[p][ri] / (float)g_zCnt[p][ri] * 1000.0f;
     int r = (int)((v - P) / I + 1.0f);                                    /* 0x806fbbb */
@@ -2023,6 +2028,7 @@ static void judgeRows(int p)
     /* botões: flash do receptor e efeito de pisar (0x807ff20), com ou sem nota */
     bool hitB[10], downB[10];
     for (int pan = 0; pan < panCount; pan++) {
+    g_jp = p;
         int pl = dn ? dnPanelPlayer(pan) : p;
         PadButton b = dn ? (PadButton)dnPanelBtn(pan) : k_btn[pan];
         hitB[pan] = Input_IsPadHit(pl, b);
@@ -2036,6 +2042,7 @@ static void judgeRows(int p)
     /* 1) acertos: a primeira linha com nota pisada encerra a busca do quadro */
     for (int ri = g_zFirst[p]; ri < g_zRows; ri++) {
         double diff = g_songTime - getRowTime(ri);
+    g_jp = p;
         if (diff < -badE) break;
         if (g_zDone[p][ri]) continue;
         bool any = false, hitNow = false;
@@ -2058,7 +2065,7 @@ static void judgeRows(int p)
              * < (linha - agora) < Perfect, ou seja diff em (-P, D+I+P); a cabeça (4) só
              * com a linha já passada. A janela é em ms (judgeWindows), fixa em qualquer BPM. */
             double hwE[4], hwL[4];
-            judgeWindows(g_game.optionDifficulty < 0 ? 0 : (g_game.optionDifficulty > 2 ? 2 : g_game.optionDifficulty),
+            judgeWindows(judgeLvl(),
                          currentJudgeBpm(), hwE, hwL);
             bool holdHit = downB[pan] && diff > -hwE[0] && diff < hwL[1] &&
                            (v == NT_HOLD_B || v == NT_HOLD_T || (v == NT_HOLD_H && diff >= 0.0));
@@ -2200,6 +2207,7 @@ static void processInput(int player)
             panel = getPanelForButton((PadButton)b);
             btn = (PadButton)b;
             usePlayer = player;
+    g_jp = player;
         }
         if (panel < 0) continue;
         if (!Input_IsPadHit(usePlayer, btn)) continue;

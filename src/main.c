@@ -176,7 +176,7 @@ void Game_ResetAllCheats(void) {
         g_game.cmdNonStep[_p]        = false;
         g_game.cmdTestBGA[_p]        = false;
         g_game.cmdXMode[_p] = g_game.cmdAccel[_p] = g_game.cmdDecel[_p] = false;
-        g_game.cmdFlash[_p] = g_game.cmdGradeRev[_p] = false;
+        g_game.cmdFlash[_p] = g_game.cmdGradeRev[_p] = g_game.cmdHard[_p] = false;
         g_game.cmdNXMode[_p] = g_game.cmdUnderAttack[_p] = false; g_game.cmdAppear[_p] = g_game.cmdSnake[_p] = g_game.cmdSink[_p] = g_game.cmdRise[_p] = false; g_game.cmdDrop = false;
     }
     Log_Print("CHEATS: reset global (ESC/GameOver)\n");
