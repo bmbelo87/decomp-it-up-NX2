@@ -150,7 +150,7 @@ void Attract_Idle(void) {
     if (g_game.state == STATE_HIGHSCORE) s_attractStep = 5;
     else if (g_game.state == STATE_LOGO_ENTER) s_attractStep = 0;
     for (int guard = 0; guard < 7; guard++) {
-        s_attractStep = (s_attractStep + 1) % 7;
+        s_attractStep = (s_attractStep + 1) % 6;   /* era: % 7 (NX: com o WPF2007 depois do HIGHSCORE). NX2: o HIGHSCORE volta ao logo da AM (indicação do usuário) */
         switch (s_attractStep) {
         case 0: Game_ChangeState(STATE_LOGO_ENTER); return;
         case 1: s_movieName = "NEXCADE"; Game_ChangeState(STATE_INTRO); return;
@@ -158,7 +158,7 @@ void Attract_Idle(void) {
         case 3: Game_ChangeState(STATE_CREDIT);     return;
         case 4: if (Demo_StartNX()) return; break;
         case 5: Game_ChangeState(STATE_HIGHSCORE);  return;
-        case 6: s_movieName = "WPF2007"; Game_ChangeState(STATE_INTRO); return;
+        /* era (NX): case 6: s_movieName = "WPF2007"; Game_ChangeState(STATE_INTRO); return; */
         }
     }
 }
