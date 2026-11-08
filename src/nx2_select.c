@@ -24,8 +24,8 @@
 
 enum { UA = 0, UB = 1, UC = 2, UD = 3, LA = 4, LB = 5, LC = 6, UCMD = 7 };
 enum { SM_IN = 0, SM_NONE, SM_LEFT, SM_RIGHT };
-enum { SN_MOVE, SN_ACC, SN_CH0, SN_CH1, SN_CH2, SN_CH3, SN_CHGMOD, SN_MODE, SN_SELSTART, SN_START, SN_WRONG, SN_HIDDEN, SN_COUNT };
-static const char* const k_wav[SN_COUNT] = { "3-2.WAV", "ACC.WAV", "B08.WAV", "B09.WAV", "B10.WAV", "B11.WAV", "CHGMOD.WAV", "A_MODE.WAV", "A_START.WAV", "START.WAV", "WRONG.WAV", "CMD_IN.WAV" };
+enum { SN_MOVE, SN_ACC, SN_CH0, SN_CH1, SN_CH2, SN_CH3, SN_CHGMOD, SN_MODE, SN_SELSTART, SN_START, SN_WRONG, SN_HIDDEN, SN_JOIN, SN_COUNT };
+static const char* const k_wav[SN_COUNT] = { "3-2.WAV", "ACC.WAV", "B08.WAV", "B09.WAV", "B10.WAV", "B11.WAV", "CHGMOD.WAV", "A_MODE.WAV", "A_START.WAV", "START.WAV", "WRONG.WAV", "CMD_IN.WAV", "JOIN.WAV" };
 static int s_snd[SN_COUNT];
 static bool s_sndInit;
 static void snd(int k) { if (s_snd[k] >= 0) Audio_Play(s_snd[k], false); }
@@ -269,10 +269,14 @@ static void setBoardCH(bool force)
 /* volta da Select depois de um estágio: o cursor (e as dificuldades) ficam na música jogada, como nas outras Pumps */
 static int  s_lastId = -1, s_lastMode[2];
 static bool s_lastSpecial;
+static bool s_joinReturn, s_jr;   /* entrada tardia (GameJoinProcess): vai ao USB_INPUT e volta à Select; s_jr = esta entrada é a volta */
+static int  s_joinId;
+bool Nx2Select_JoinPending(void) { return s_joinReturn; }
 
 void Nx2Select_Enter(void)
 {
     s_special = (g_game.nxGameMode == 1);
+    s_jr = s_joinReturn; s_joinReturn = false;   /* volta do USB_INPUT da entrada tardia (m_bWasJoin) */
     s_active = Title_GetJoinedMask() & 3;
     if (!s_active) s_active = 1;
     if (getenv("PUMPY_JOIN")) s_active = atoi(getenv("PUMPY_JOIN")) & 3;   /* teste: força os jogadores da Select */
@@ -366,6 +370,7 @@ void Nx2Select_Enter(void)
     int ss = s_special ? 0 : ((g_nx2HasProfile[0] || g_nx2HasProfile[1]) ? 0xE01 : 0xE13);
     bool keepLast = (g_game.stageCount != 3 && g_game.svcGameMode != 1 && s_lastId >= 0 && s_lastSpecial == (bool)s_special);
     if (keepLast) ss = s_lastId;   /* 2º/3º estágio: última música jogada */
+    if (s_jr) ss = s_joinId;       /* entrada tardia: continua na mesma música (IndexFromTrack) */
     s_cur = 0;
     for (int i = 0; i < s_count; i++) if ((int)g_songTable[s_list[i]].id == ss) { s_cur = i; break; }
     s_selected = s_end = s_endStarted = false; s_endCnt = 0;
@@ -381,7 +386,7 @@ void Nx2Select_Enter(void)
         reorganize(SM_IN);
         setBoardCH(true);
         s_mode[0] = s_mode[1] = s_userMode[0] = s_userMode[1] = 0;      /* MODE_NORMAL */
-        if (keepLast) { s_mode[0] = s_userMode[0] = s_lastMode[0]; s_mode[1] = s_userMode[1] = s_lastMode[1]; }   /* validateMode ajusta se não existir */
+        if (keepLast && !s_jr) { s_mode[0] = s_userMode[0] = s_lastMode[0]; s_mode[1] = s_userMode[1] = s_lastMode[1]; }   /* validateMode ajusta se não existir */
         if (getenv("PUMPY_P2MODE")) { s_mode[1] = s_userMode[1] = atoi(getenv("PUMPY_P2MODE")); }   /* teste: dificuldade do P2 */
         validateMode();
         setExerciseInfo();
@@ -860,7 +865,7 @@ static void cmdSessionInit(void)
 {
     iconInit();
     memset(s_cq, 0, sizeof(s_cq));
-    if (g_game.stageCount == 3 || g_game.svcGameMode == 1) {      /* códigos valem pela sessão: zera no 1º estágio */
+    if ((g_game.stageCount == 3 || g_game.svcGameMode == 1) && !s_jr) {      /* códigos valem pela sessão: zera no 1º estágio */
         for (int p = 0; p < 2; p++) { s_cspd[p] = 1; s_chalf[p] = false; s_cspec[p] = 0; memset(s_cflag[p], 0, sizeof(s_cflag[p])); s_cvan[p] = 0; s_cskin[p] = -1; s_crnd[p] = false; }
         s_cua = s_cnx = s_cdrop = false;
     }
@@ -1011,6 +1016,17 @@ void Nx2Select_Update(float dt)
             BGA_SceneReset(UC, "single_kcal-vo2(all)");
             BGA_SceneReset(UD, "single_high_score_in");
         }
+    }
+    for (int p = 0; p < 2; p++) {   /* ProcessInput: jogador ausente + CENTER + crédito = GameJoinProcess */
+        if ((s_active & (1u << p)) || !Input_IsPadHit(p, PAD_C) || !Coin_HasCredit()) continue;
+        Coin_ConsumeCredit();
+        snd(SN_JOIN);                                      /* Effect("EFF_JOIN") (som não conferido) */
+        previewStop();
+        Title_SetJoinedMask(Title_GetJoinedMask() | (1u << p));
+        s_joinReturn = true; s_joinId = (int)g_songTable[s_list[s_cur]].id;
+        /* falta: cena USB_OTHER_PLAYER_IN do USB_COMMON.DAT (CUsbstate) antes do Next(true) */
+        Game_ChangeState(STATE_NX_USBIN);
+        return;
     }
     for (int p = 0; p < 2; p++) {
         if (!(s_active & (1u << p))) continue;

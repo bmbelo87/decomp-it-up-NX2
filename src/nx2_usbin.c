@@ -30,6 +30,7 @@ enum { UA = 0, UB = 1, UC = 2, UD = 3, UE = 4 };   /* ordem de carga: USB_INPUT,
 enum { MSG_CONNECT = 0, MSG_SAVE, MSG_FINISH, MSG_REG_ERR, MSG_USB_ERR, MSG_WRITE_ERR };
 
 extern unsigned Title_GetJoinedMask(void);
+extern bool Nx2Select_JoinPending(void);   /* flowcontrol: UsbInput -> MusicSelect se a Station já foi escolhida */
 
 static bool    s_ok;
 static int     s_phase;            /* 1 intro, 2 espera, 3 saída */
@@ -262,7 +263,7 @@ void NxUsbIn_Update(float dt)
 {
     if (g_game.stateFrame == 1) NxUsbIn_Enter();
     Movie_Update(dt);
-    if (!s_ok) { Game_ChangeState(STATE_STATION); return; }
+    if (!s_ok) { Game_ChangeState(Nx2Select_JoinPending() ? STATE_SELECT : STATE_STATION); return; }
 
     if (s_phase == 1) {                                   /* Start: intro */
         if (BGA_SceneDone(UA, "USB_intro")) { s_t0 = timeGetTime(); s_phase = 2; }
@@ -275,7 +276,7 @@ void NxUsbIn_Update(float dt)
             }
             Movie_Close();
             Resource_ClearBGA();
-            Game_ChangeState(STATE_STATION);
+            Game_ChangeState(Nx2Select_JoinPending() ? STATE_SELECT : STATE_STATION);
         }
         return;
     }
