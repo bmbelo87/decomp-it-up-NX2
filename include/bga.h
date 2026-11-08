@@ -35,6 +35,8 @@ typedef struct {
     char filename[64];
     int isSPR, sprTileStart, sprTileCount, texId, aniFrameCount, patCols, patRows, patFlags;
 } BGALayerSrc;
+int  BGA_GetActivePic(void);        /* extra do port */
+void BGA_SetActivePic(int i);
 bool BGA_GetLayerSrc(int bgaIndex, int slot, BGALayerSrc* out);
 void BGA_SetLayerSrc(int bgaIndex, int slot, const BGALayerSrc* src);
 /* posição (pivô) interpolada do slot no quadro; false se invisível */

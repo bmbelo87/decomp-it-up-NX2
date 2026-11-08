@@ -316,6 +316,10 @@ static bool parseBGA0(const uint8_t* bgaData, uint32_t bgaSize) {
     return false;
 }
 
+/* extra do port: quem acrescenta um BGA depois da tela pronta (nx2_usbstate.c) devolve o BGA ativo, senao o desenho generico muda de figura */
+int  BGA_GetActivePic(void) { return bga_activePic; }
+void BGA_SetActivePic(int i) { bga_activePic = i; }
+
 void BGA_Reset(void) {
     bga_activePic = -1;
     if (g_game.bgaPicCount > 0) {

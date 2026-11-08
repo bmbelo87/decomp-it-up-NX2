@@ -79,6 +79,9 @@ void NxSports_Store(int st) {
     }
 }
 
+int NxSports_StageCount(void) { return s_stages; }   /* extra do port: lido pela versao NX2 (nx2_sports.c) */
+GameState NxSports_NextState(void) { return s_next; }
+
 /* estado depois da nota/stage break: passa pela SPORTS quando o original passa */
 GameState NxSports_Route(GameState ns, bool fromStageBreak, int stage) {
     if (!g_hexSongIds || g_game.nxGameMode == 2) return ns;

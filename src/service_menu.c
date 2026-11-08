@@ -810,13 +810,14 @@ static void svcRenderGameOption(void)
  * MODDED — UNLOCK SPECIAL ZONE, tecla do autoplay (F8) e tecla do teste do Dance Grade (F12).
  * O índice aqui é o id do item (usado nos switch); a ordem na tela vem de svcGameOptRows. */
 /* era: SVC_GAMEOPT_ITEMS[15]; "USE OLD DATA SONGS" (15) é extra do port, só no MODDED (old_data.c) */
-static const char* SVC_GAMEOPT_ITEMS[16] = {
+/* era: [16]; "SAVE AND EXIT" (16) é extra pedido pelo usuário (o script do NX2 o deixa comentado) */
+static const char* SVC_GAMEOPT_ITEMS[17] = {
     "GAME MODE", "LEVEL", "STAGE BREAK", "DEMO SOUND", "SHOW HELP",
     "DEFAULT STATION", "MERCY TICKET", "SCORE PER TICKET", "UNLOCK SPECIAL ZONE", "GAME STYLE",
-    "", "DEFAULT SETTING", "EXIT", "AUTOPLAY KEY (F8)", "DG TEST KEY (F12)", "USE OLD DATA SONGS"
+    "", "DEFAULT SETTING", "EXIT", "AUTOPLAY KEY (F8)", "DG TEST KEY (F12)", "USE OLD DATA SONGS", "SAVE AND EXIT"
 };
 /* linhas visíveis, de cima para baixo; devolve a quantidade */
-static int svcGameOptRows(int rows[16])
+static int svcGameOptRows(int rows[20])
 {
     int n = 0;
     for (int i = 0; i <= 7; i++) rows[n++] = i;
@@ -824,6 +825,7 @@ static int svcGameOptRows(int rows[16])
     if (g_game.gameStyleModded) { rows[n++] = 8; rows[n++] = 13; rows[n++] = 14; rows[n++] = 15; }   /* era: sem o 15 */
     rows[n++] = 10;                      /* MENU_BLANK */
     rows[n++] = 11;                      /* DEFAULT SETTING */
+    rows[n++] = 16;                      /* SAVE AND EXIT */
     rows[n++] = 12;                      /* EXIT */
     return n;
 }
@@ -866,7 +868,7 @@ static void svcRenderGameOption(void)
     svcColor(SVC_NORMAL);
     svcText(276.0f, 428.0f, "GAME OPTION");
 
-    int rows[16];   /* era: rows[15] */
+    int rows[20];   /* era: rows[15] */
     int nRows = svcGameOptRows(rows);
     if (g_svcCursor >= nRows) g_svcCursor = nRows - 1;   /* a lista encolhe ao voltar para VANILLA */
     for (int row = 0; row < nRows; row++) {   /* era: for (i = 0; i < 13; i++), índice = linha */
@@ -971,6 +973,7 @@ static void svcRenderGameOption(void)
         case 14: g_game.keyDgTest = !g_game.keyDgTest; break;
         case 15: g_game.useOldData = !g_game.useOldData; break;
         case 11: svcGameOptionReset(); break;   /* era 10 */
+        case 16:                                /* SAVE AND EXIT (extra): salva e sai */
         case 12:                                /* era 11 */
             GameOption_Save();
             g_svcPage = 0;
@@ -1224,8 +1227,9 @@ static void svcRenderCoinOption(void)
  * n = 1 CREDIT / n COINS), COIN2 +0xED7 (n = n CREDITS / 1 COIN), CREDIT LIMIT
  * +0xED5 (0 OFF, 1..10). Padrões: COIN1 = 5, COIN2 = 1, CREDIT LIMIT = OFF.
  * "SAVE AND EXIT" comentado no script: o EXIT grava. */
-static const char* SVC_COINOPT_ITEMS[6] = {
-    "COIN1 SETTING", "COIN2 SETTING", "CREDIT LIMIT", "", "DEFAULT SETTING", "EXIT"
+/* era: [6] sem "SAVE AND EXIT" (extra pedido pelo usuário) */
+static const char* SVC_COINOPT_ITEMS[7] = {
+    "COIN1 SETTING", "COIN2 SETTING", "CREDIT LIMIT", "", "DEFAULT SETTING", "SAVE AND EXIT", "EXIT"
 };
 
 static void svcRenderCoinOption(void)
@@ -1239,7 +1243,7 @@ static void svcRenderCoinOption(void)
     svcColor(SVC_NORMAL);
     svcText(276.0f, 428.0f, "COIN OPTION");
 
-    for (i = 0; i < 6; i++) {
+    for (i = 0; i < 7; i++) {
         if (i == 3) continue;   /* MENU_BLANK */
         svcColorFor(i, g_svcCursor);
         svcText(196.0f, (float)(352 - i * 20), SVC_COINOPT_ITEMS[i]);
@@ -1266,11 +1270,11 @@ static void svcRenderCoinOption(void)
     if (hit & SVC_BIT_TEST) {
         do {
             g_svcCursor++;
-            if (g_svcCursor > 5) g_svcCursor = 0;
+            if (g_svcCursor > 6) g_svcCursor = 0;
         } while (g_svcCursor == 3);
     } else if (hit & SVC_BIT_UP) {
         do {
-            g_svcCursor = (g_svcCursor <= 0) ? 5 : (g_svcCursor - 1);
+            g_svcCursor = (g_svcCursor <= 0) ? 6 : (g_svcCursor - 1);
         } while (g_svcCursor == 3);
     }
     if (hit & SVC_BIT_SERVICE) {
@@ -1283,7 +1287,8 @@ static void svcRenderCoinOption(void)
             g_game.svcCoin2 = 1;
             Eeprom_Set8(0xED5, 0);
             break;
-        case 5:
+        case 5:   /* SAVE AND EXIT (extra) */
+        case 6:
             GameOption_Save();
             g_svcPage = 0;
             break;
@@ -1707,6 +1712,7 @@ void ServiceMenu_Enter(void)
 void ServiceMenu_Exit(void)
 {
     Log_Print("ServiceMenu: saiu\n");
+    GameOption_Save();   /* extra: sair do setup grava as opções (o EXIT do topo não gravava) */
     Game_ChangeState(STATE_LOGO_ENTER);
 }
 

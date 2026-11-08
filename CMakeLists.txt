@@ -220,6 +220,8 @@ add_executable(Pumpy
     src/nx2_usbin.c
     src/nx2_station.c
     src/nx2_select.c
+    src/nx2_usbstate.c
+    src/nx2_sports.c
     src/song.c
     src/zlibinflate.c
     # src/xbrz.c        # UPSCALE (xBRZ) das texturas — DESATIVADO (30/09/2026)

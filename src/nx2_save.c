@@ -19,10 +19,10 @@
 #endif
 #include <time.h>
 
-/* tamanhos verificados com amostras reais (30488, 292, 16392, 31832, 676, 120004) */
+/* tamanhos verificados com amostras reais (30488, 292, 12296, 31832, 676, 120004) */
 typedef char nx2_chk_stat[(sizeof(Nx2Stat) == 30488) ? 1 : -1];
 typedef char nx2_chk_review[(sizeof(Nx2Review) == 292) ? 1 : -1];
-typedef char nx2_chk_rankinfo[(sizeof(Nx2RankInfo) == 16392) ? 1 : -1];
+typedef char nx2_chk_rankinfo[(sizeof(Nx2RankInfo) == 12296) ? 1 : -1];
 typedef char nx2_chk_option[(sizeof(Nx2Option) == 31832) ? 1 : -1];
 typedef char nx2_chk_rank[(sizeof(Nx2Rank) == 676) ? 1 : -1];
 typedef char nx2_chk_mrank[(sizeof(Nx2MRank) == 120004) ? 1 : -1];
@@ -233,20 +233,20 @@ int Nx2Profile_Load(int player)
 {
     if (player < 0 || player > 1) return NX2_USB_NOCONFIG;
     char root[MAX_PATH], path[MAX_PATH];
-    if (!profRoot(player, root, sizeof(root))) return NX2_USB_NOTINSERTED;
+    if (!profRoot(player, root, sizeof(root))) { static char warned[2]; if (!warned[player]) { warned[player] = 1; Log_Print("NX2SAVE: P%d pendrive nao inserido (raiz '%s' nao existe)\n", player + 1, root); } return NX2_USB_NOTINSERTED; }
 
     profFile(player, "nx2save.bin", path, sizeof(path));
     FILE* f = fopen(path, "rb");
-    if (!f) return NX2_USB_NODATA;
+    if (!f) { Log_Print("NX2SAVE: P%d sem dados: '%s' nao existe\n", player + 1, path); return NX2_USB_NODATA; }
     Nx2Review rev; Nx2Stat* st = (Nx2Stat*)malloc(sizeof(Nx2Stat));
     if (!st) { fclose(f); return NX2_USB_BADDATA; }
     memset(&rev, 0, sizeof(rev)); memset(st, 0, sizeof(*st));
     size_t r1 = fread(&rev, 1, sizeof(rev), f);
     size_t r2 = fread(st, 1, sizeof(*st), f);
     fclose(f);
-    if (r1 != sizeof(rev) || r2 != sizeof(*st)) { free(st); return NX2_USB_BADDATA; }
+    if (r1 != sizeof(rev) || r2 != sizeof(*st)) { Log_Print("NX2SAVE: P%d nx2save.bin com tamanho errado (%u + %u, esperado %u + %u)\n", player + 1, (unsigned)r1, (unsigned)r2, (unsigned)sizeof(rev), (unsigned)sizeof(*st)); free(st); return NX2_USB_BADDATA; }
     nx2Dec(st, sizeof(*st));
-    if (st->CheckSum != nx2Adler((const uint8_t*)st + 4, sizeof(*st) - 4)) { free(st); return NX2_USB_BADDATA; }
+    if (st->CheckSum != nx2Adler((const uint8_t*)st + 4, sizeof(*st) - 4)) { Log_Print("NX2SAVE: P%d nx2save.bin com checksum invalido\n", player + 1); free(st); return NX2_USB_BADDATA; }
 
     Nx2RankInfo* rk = (Nx2RankInfo*)malloc(sizeof(Nx2RankInfo));
     if (!rk) { free(st); return NX2_USB_BADDATA; }
@@ -262,12 +262,13 @@ int Nx2Profile_Load(int player)
             okRank = rk->CheckSum == nx2Adler((const uint8_t*)rk + 4, sizeof(*rk) - 4);
         }
     }
-    if (!okRank) { free(st); free(rk); return NX2_USB_BADDATA; }
+    if (!okRank) { Log_Print("NX2SAVE: P%d nx2rank.bin ausente ou invalido ('%s')\n", player + 1, path); free(st); free(rk); return NX2_USB_BADDATA; }
 
     s_review[player] = rev;
     g_nx2Prof[player] = *st;
     g_nx2ProfRank[player] = *rk;
     g_nx2HasProfile[player] = true;
+    Log_Print("NX2SAVE: P%d perfil carregado de '%s'\n", player + 1, root);
     free(st); free(rk);
     return NX2_USB_OK;
 }
@@ -321,7 +322,7 @@ int Nx2Profile_SaveRank(int player, const Nx2RankUnit info[NX2_MAX_STAGE])
     Nx2RankInfo* rk = &g_nx2ProfRank[player];
     rk->nCnt %= 128;
     uint32_t no = rk->nCnt;
-    for (int i = 0; i < NX2_MAX_STAGE; i++) rk->tRI[no][i] = info[i];
+    for (int i = 0; i < NX2_RANK_STAGE; i++) rk->tRI[no][i] = info[i];
     rk->nCnt = (rk->nCnt + 1) % 128;
     rk->CheckSum = nx2Adler((const uint8_t*)rk + 4, sizeof(*rk) - 4);
 

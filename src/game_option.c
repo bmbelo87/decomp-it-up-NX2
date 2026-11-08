@@ -39,13 +39,8 @@ static bool loadIni(bool all)
         if (sscanf(line, "DgTestKey=%d",   &v) == 1) g_game.keyDgTest   = (v != 0);       /* extra do port (MODDED): F12 */
         if (sscanf(line, "UseOldData=%d",  &v) == 1) g_game.useOldData  = (v != 0);       /* extra do port (MODDED): old_data.c */
         /* if (sscanf(line, "Upscale=%d",     &v) == 1) g_game.gfxUpscale   = (v >= 2 && v <= 4) ? v : 0;   UPSCALE desativado */
-        if (!all) continue;
-        if (sscanf(line, "Difficulty=%d",  &v) == 1) g_game.optionDifficulty = v;
-        if (sscanf(line, "StageBreak=%d",  &v) == 1) g_game.optionToggle1    = v;
-        if (sscanf(line, "ShowHelp=%d",    &v) == 1) g_game.optionToggle2    = v;
-        if (sscanf(line, "GameMode=%d",    &v) == 1) g_game.svcGameMode      = v;
-        if (sscanf(line, "DemoSound=%d",   &v) == 1) g_game.svcDemoSound     = v;
-        if (sscanf(line, "LangOption=%d",  &v) == 1) g_game.svcLangOption    = v;
+        /* USB DRIVE (extra do port): fica antes do "if (!all)", senão nunca é lido na partida (all == false) e o
+         * próximo GameOption_Save gravava vazio */
         for (int up = 0; up < 2; up++) {   /* USB DRIVE do service (usbBus[up]) */
             char key[16], val[260];
             snprintf(key, sizeof(key), "UsbRoot%d=", up);
@@ -55,6 +50,13 @@ static bool loadIni(bool all)
                 snprintf(g_nx2UsbRoot[up], sizeof(g_nx2UsbRoot[up]), "%s", val);
             }
         }
+        if (!all) continue;
+        if (sscanf(line, "Difficulty=%d",  &v) == 1) g_game.optionDifficulty = v;
+        if (sscanf(line, "StageBreak=%d",  &v) == 1) g_game.optionToggle1    = v;
+        if (sscanf(line, "ShowHelp=%d",    &v) == 1) g_game.optionToggle2    = v;
+        if (sscanf(line, "GameMode=%d",    &v) == 1) g_game.svcGameMode      = v;
+        if (sscanf(line, "DemoSound=%d",   &v) == 1) g_game.svcDemoSound     = v;
+        if (sscanf(line, "LangOption=%d",  &v) == 1) g_game.svcLangOption    = v;
         if (sscanf(line, "Coin1=%d",       &v) == 1) g_game.svcCoin1         = v;
         if (sscanf(line, "Coin2=%d",       &v) == 1) g_game.svcCoin2         = v;
         if (sscanf(line, "CoinTotal=%d",   &v) == 1) g_game.svcCoinTotal     = v;

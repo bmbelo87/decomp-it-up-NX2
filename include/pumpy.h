@@ -263,6 +263,8 @@ void Nx2Select_Render(void);
 void NxUsbIn_Update(float dt);   /* nx2_usbin.c */
 void NxUsbIn_Render(void);
 void NxSports_Update(float dt);
+void Nx2Sports_Update(float dt);   /* nx2_sports.c: CSports do NX2 (SPORTS.DAT + SPORTS_GRAPH.DAT) */
+void Nx2Sports_Render(void);
 void NxSports_Render(void);
 extern int g_nxTrainN;          /* lição * 10 + parte (1..20, 1..3) do RUN T%02d%d ([+0xd2cc]) */
 void NxTraining_Update(float dt);
@@ -292,12 +294,13 @@ extern const Nx2SongExtra g_nx2SongExtra[SONG_TABLE_COUNT];
  *   RANK.DAT    Nx2Rank      676 B  plano, Adler-32 de m_Scores
  *   MRANK.DAT   Nx2MRank  120004 B  plano, Adler-32 de m_Scores
  *   nx2save.bin Nx2Review+Nx2Stat  30780 B (Stat cifrado por Enc/Dec + Adler-32 após o 1º u32)
- *   nx2rank.bin Nx2RankInfo 16392 B (cifrado por Enc/Dec + Adler-32 após o 1º u32)
+ *   nx2rank.bin Nx2RankInfo 12296 B (cifrado por Enc/Dec + Adler-32 após o 1º u32)
  * ------------------------------------------------------------------------------------------- */
 #define NX2_ID_MAX      12
 #define NX2_SONG_MAX    256
 #define NX2_MISSION_MAX 1024
 #define NX2_MAX_STAGE   4
+#define NX2_RANK_STAGE  3   /* fases por registro do nx2rank.bin: o piu lê 0x3008 bytes (12296), nao 0x4008 do nx2src (MAX_STAGE 4); confere com um nx2rank.bin real */
 #pragma pack(push, 1)
 typedef struct { int16_t year; int8_t month, day, hour, min; uint16_t ms; } Nx2Time;
 #pragma pack(pop)
@@ -328,7 +331,7 @@ typedef struct {                             /* primeiros 292 bytes de nx2save.b
     int32_t ikcal, iVO2;
 } Nx2Review;
 typedef struct { int32_t iGameMode, iPlayOrder, iPlayScore, iGrade, iMileage; float fPlayTime, fKcal, fVO2; } Nx2RankUnit;
-typedef struct { uint32_t CheckSum, nCnt; Nx2RankUnit tRI[128][NX2_MAX_STAGE]; } Nx2RankInfo;
+typedef struct { uint32_t CheckSum, nCnt; Nx2RankUnit tRI[128][NX2_RANK_STAGE]; } Nx2RankInfo;
 #pragma pack(pop)
 #pragma pack(push, 1)
 typedef struct {
@@ -1008,6 +1011,7 @@ const char* Song_DataIdStr(int id);
 bool Select_IsXMode(void);
 unsigned Select_GetFlags(void);
 void Attract_Idle(void);            /* Exceed CIdle: próxima tela da atração */
+void NxUsbState_Draw(void);        /* nx2_usbstate.c: apelido do perfil USB no canto de baixo (USB_NICKNAME.DAT) */
 void NxCredit_Draw(void);           /* nx_credit.c: faixa de crédito / FREE PLAY / EVENT / DEMO PLAY (CREDIT.DAT) */
 void Attract_Restart(void);         /* fim de um crédito: recomeça o laço da atração pelo logo */
 bool Attract_HasCredit(void);     /* "tem crédito" das telas da atração (MODDED + FREE PLAY: só após CENTER) */

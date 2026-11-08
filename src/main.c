@@ -631,7 +631,7 @@ void Game_Update(float dt) {
         NxMission_Update(dt);
         break;
     case STATE_NX_SPORTS:
-        NxSports_Update(dt);
+        Nx2Sports_Update(dt);   /* era: NxSports_Update (NX, nx_sports.c) */
         break;
     case STATE_NX_USBIN:
         NxUsbIn_Update(dt);
@@ -1083,7 +1083,7 @@ void Game_Render(void) {
         NxClear_Render();
         break;
     case STATE_NX_SPORTS:
-        NxSports_Render();
+        Nx2Sports_Render();   /* era: NxSports_Render (NX) */
         break;
     case STATE_NX_USBIN:
         NxUsbIn_Render();
@@ -1154,6 +1154,7 @@ void Game_Render(void) {
         Log_Print("RENDER: state=%d isVSL=%d globalA=%.2f frame=%d\n", g_game.state, g_game.isVSL, g_game.globalColorA, g_game.bgaFrame);
         renderLogCount++;
     }
+    NxUsbState_Draw(); /* CUsbstate::Draw: apelido do perfil (Station, Select, Dance Grade) */
     NxCredit_Draw();   /* NX2 main.cpp:604: g_CreditManager.Draw() por cima de toda tela, menos o SETUP */
     Render_EndScene();
 }
