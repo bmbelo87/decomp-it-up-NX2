@@ -1056,9 +1056,13 @@ static void zeroHoldDrawOld(int panel, int col, float left, float yh, float yt, 
 /* Sink/Rise nos longs: o z varia ao longo do corpo (fita coerente entre cabeça e ponta);
  * g_hdP = jogador (-1 = sem Sink/Rise), g_hdY0 = y do receptor (centro) */
 static int g_hdP = -1; static float g_hdY0;
+/* VANILLA (piu 0x806e7e4 DrawLongNote / DrawLine 0x8076b16): o long inteiro sai num z único (pLong->Z = z da linha
+ * gravada) e z = 0 quando segurado (bPress); MODDED: fita contínua com z por borda (melhor que o original, pedido do usuário) */
+static bool g_hdFlatOn; static float g_hdFlat;
 static float snkZat(float yy)
 {
     if (g_hdP < 0) return 0.0f;
+    if (g_hdFlatOn) return g_hdFlat;
     float h = g_game.cmdNXMode[g_hdP] ? 200.0f : 64.0f;
     if (g_game.cmdRise[g_hdP]) h = -h;
     return h * sinf(-nxAccelInv(g_hdP, yy - g_hdY0) * 3.141592f / 378.0f);
@@ -1071,7 +1075,7 @@ static void hdDrawZ(int id, float x, float y, float w, float h, float u1, float 
     Texture_DrawUVZ(id, x, y, w, h, u1, v1, u2, v2, r, g, b, a, zt, zb);
 }
 static void zTr(float z);
-static void holdDraw(int panel, int col, float left, float yh, float yt, bool held, float alpha)
+static void holdDraw2(int panel, int col, float left, float yh, float yt, bool held, float alpha)
 {
     (void)panel;   /* segurado (held): o chamador já passa yh = receptor */
     if (g_skinL1[col] < 0 || g_skinL2[col] < 0 || g_skinL3[col] < 0) return;
@@ -1099,7 +1103,7 @@ static void holdDraw(int panel, int col, float left, float yh, float yt, bool he
         float yLo = 63.0f + (float)bt->srcY, yHi = height + 1.0f + (float)bt->srcY;
         {
             float bTop = lineT - yHi, bTotal = yHi - yLo;
-            int ns_ = (g_hdP >= 0) ? (int)(bTotal / 12.0f) + 1 : 1;
+            int ns_ = (g_hdP >= 0 && g_game.gameStyleModded) ? (int)(bTotal / 12.0f) + 1 : 1;
             if (ns_ > 96) ns_ = 96;
             float vA = bt->v1 * bh, vB = bt->v2 * bh;
             for (int k_ = 0; k_ < ns_; k_++) {
@@ -1152,6 +1156,16 @@ static void holdDraw(int panel, int col, float left, float yh, float yt, bool he
                    (float)hs->srcW, (float)hs->srcH,
                    hs->u1 * hw, hs->v1 * hh, hs->u2 * hw, hs->v2 * hh, 1, 1, 1, alpha);
     g_hdHeld = false;
+}
+
+static void holdDraw(int panel, int col, float left, float yh, float yt, bool held, float alpha)
+{
+    if (g_hdP >= 0 && !g_game.gameStyleModded) {        /* VANILLA: z único, o da linha da ponta; segurado = 0 */
+        g_hdFlat = held ? 0.0f : snkZat(yt + 32.0f);
+        g_hdFlatOn = true;
+    }
+    holdDraw2(panel, col, left, yh, yt, held, alpha);
+    g_hdFlatOn = false;
 }
 
 static int g_hitTimer[2][MAX_PANELS]; // hit flash animation timer (p1)
