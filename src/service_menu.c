@@ -338,7 +338,8 @@ static const struct { const char* name; int page; } SVC_TOP[] = {
     { "EXIT",              9 },
 };
 #define SVC_TOP_COUNT ((int)(sizeof(SVC_TOP) / sizeof(SVC_TOP[0])))
-static const char* SVC_LANG_NX[4] = { "KOREAN", "ENGLISH", "SPANISH", "CHINESE(T)" };
+/* era: "CHINESE(T)" (NX); NX2 SETUP_EN.LUA: SETUP_VALUE_CHINESE = "PORTUGUESE", e KOREAN = "KOREAN (한글)" */
+static const char* SVC_LANG_NX[4] = { "KOREAN", "ENGLISH", "SPANISH", "PORTUGUESE" };
 
 static void svcRenderMain(void)
 {
@@ -777,9 +778,11 @@ static int svcGameOptRows(int rows[16])
 }
 static const char* SVC_LEVEL_NAMES[3]  = { "1. EASY", "2. NORMAL", "3. HARD" };
 static const char* SVC_STAGEBRK_NX[5]  = { "OFF", "1ST STAGE", "2ND STAGE", "3RD STAGE", "4TH STAGE" };
-static const char* SVC_STATION_NX[4]   = { "TRAINING STATION", "ARCADE STATION", "WORLD TOUR", "SPECIAL ZONE" };
+/* era: "WORLD TOUR" (NX); NX2 SETUP_EN.LUA: SETUP_VALUE_TOUR = "WORLD MAX" */
+static const char* SVC_STATION_NX[4]   = { "TRAINING STATION", "ARCADE STATION", "WORLD MAX", "SPECIAL ZONE" };
+static const char* SVC_MERCY_NX[11]    = { "OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" };   /* NX2: SETUP_GAMESETTING_MERCY_TICKET */
 static const char* SVC_SCORETKT_NX[7]  = { "OFF", "100000", "200000", "300000", "400000", "500000", "1000000" };
-#define SVC_MERCY_COUNT 1
+#define SVC_MERCY_COUNT 11   /* era: 1 (só OFF); NX2: OFF, 1..10 */
 
 /* padrões do script (3º campo, base 1) */
 static void svcGameOptionReset(void)
@@ -849,7 +852,7 @@ static void svcRenderGameOption(void)
             break;
         case 6:
             if (mercy == 0) svcColor(SVC_SUCCESS);
-            svcText(404.0f, y, "OFF");
+            svcText(404.0f, y, SVC_MERCY_NX[mercy]);   /* era: "OFF" fixo */
             break;
         case 7:
             if (stkt == 0) svcColor(SVC_SUCCESS);
