@@ -93,7 +93,7 @@ def main():
             fl=tuple(b[o + 0x34:o + 0x3A]), tex=struct.unpack_from("<i", b, o + 0x3C)[0],
             lock=b[o + 0x40:o + 0x45], mplay=tuple(b[o + 0x45:o + 0x4A]), demo=b[o + 0x4A],
             length=tm, mileage=mil, modemil=struct.unpack_from("<5h", b, o + 0x50),
-            base=res if res >= 0x100 else -1))
+            base=(0xC04 if res == 0xC1C04 else res) if res >= 0x100 else -1))   # resmap do piu aponta DC04 -> 0xC1C04, que nao existe em TITLE/PREVIEW/EYE_SMALL (so C04.*)
     chans = [[s["id"] for s in songs if s["ch"] == c] for c in range(len(CHANNEL_NAMES))]
     cmax = max(len(c) for c in chans) + 1
 
