@@ -22,9 +22,11 @@ static unsigned s_gen = 0xFFFFFFFFu;
 static int      s_bga = -1;
 static int      s_fontTex = -1;
 static bool     s_failed;
+static bool     s_disc[2];         /* E_USB_DISCONNECTED: pendrive retirado no meio da sessão (main.cpp:589) */
 static bool     s_animDone[2];     /* a barra entra animada uma vez por perfil; nas telas seguintes já aparece aberta */
 
 static const char* k_scene[2] = { "1 player", "2 player" };
+static const char* k_uncable[2] = { "1_PLAYER_(UNCABLE_USB)", "2_PLAYER_(UNCABLE_USB)" };   /* = UNCABLE_USB_1P/2P do USB_COMMON.DAT */
 
 static bool load(void)
 {
@@ -69,12 +71,19 @@ void NxUsbState_Draw(void)
     /* telas que mostram o perfil (CUsbstate::Draw); WORLD MAX e TRAINING do NX2 ainda não foram portados */
     if (g_game.state != STATE_STATION && g_game.state != STATE_SELECT &&
         g_game.state != STATE_DANCE_GRADE_ENTER && g_game.state != STATE_DANCE_GRADE_DISPLAY &&
-        g_game.state != STATE_GAMEPLAY) return;
+        g_game.state != STATE_GAMEPLAY && g_game.state != STATE_NX_SPORTS) return;
     unsigned mask = Title_GetJoinedMask() & 3;
     bool any = false;
     for (int p = 0; p < 2; p++) {
-        if (!g_nx2HasProfile[p]) s_animDone[p] = false;
-        else if (mask & (1u << p)) any = true;
+        if (!g_nx2HasProfile[p]) { s_animDone[p] = false; s_disc[p] = false; }
+        else if (mask & (1u << p)) {
+            any = true;
+            /* main.cpp:589: com a sessão em andamento, CheckUsb() falso -> E_USB_DISCONNECTED (fica assim até o fim do crédito) */
+            if (!s_disc[p] && Nx2Profile_CheckUsb(p) == false) {
+                Log_Print("NX2USBSTATE: P%d pendrive retirado\n", p + 1);
+                s_disc[p] = true;
+            }
+        }
     }
     if (!any || Loading_IsActive() || !load()) return;
 
@@ -83,6 +92,10 @@ void NxUsbState_Draw(void)
     glColor4f(1.f, 1.f, 1.f, 1.f);
     for (int p = 0; p < 2; p++) {
         if (!g_nx2HasProfile[p] || !(mask & (1u << p))) continue;
+        if (s_disc[p]) {                          /* DrawPlayerState: DISCONNECTED -> cena UNCABLE no lugar do apelido */
+            BGA_ScenePlay(s_bga, k_uncable[p], true);
+            continue;
+        }
         BGA_ScenePlay(s_bga, k_scene[p], true);
         if (BGA_SceneDone(s_bga, k_scene[p])) s_animDone[p] = true;
         char nick[NX2_ID_MAX + 1];

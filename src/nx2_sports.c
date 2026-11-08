@@ -153,7 +153,8 @@ static void leave(void)
 {
     Movie_Close();
     Resource_ClearBGA();
-    Game_ChangeState(g_game.nxGameMode == 0 ? NxSports_NextState() : STATE_GAMEOVER_ENTER);
+    /* FitnessInfo (piu 0x8062288): qualquer estação exceto Training vai para USB_OUTPUT; a própria tela decide o próximo */
+    Game_ChangeState(g_game.nxGameMode <= 1 ? STATE_NX_USBOUT : STATE_GAMEOVER_ENTER);
 }
 
 void Nx2Sports_Update(float dt)

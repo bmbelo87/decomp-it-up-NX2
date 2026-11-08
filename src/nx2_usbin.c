@@ -309,6 +309,7 @@ void NxUsbIn_Update(float dt)
     if (s_time <= 0) {
         if (s_selected) {
             Audio_Play(g_waveSoundIds[SND_START], false);   /* Effect("EFF_START") */
+            for (int p = 0; p < 2; p++) if (s_active & (1 << p)) Nx2Sess_Start(p);   /* g_Player[].m_iMileage = CREDIT_MILEAGE (select.cpp:2215) */
             s_cnt = 0;
             s_phase = 3;
             return;

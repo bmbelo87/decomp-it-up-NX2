@@ -33,6 +33,8 @@ Nx2Option  g_nx2Opt;
 Nx2Stat    g_nx2Prof[2];
 Nx2RankInfo g_nx2ProfRank[2];
 bool       g_nx2HasProfile[2];
+Nx2Session g_nx2Sess[2];
+Nx2RankUnit g_nx2StageInfo[2][NX2_MAX_STAGE];
 char       g_nx2UsbRoot[2][260];   /* g_Option.usbBus (SETUP USB DRIVE); no PC é a raiz do drive escolhido (ex. "E:\") */
 static Nx2Review s_review[2];
 
@@ -225,6 +227,22 @@ void Nx2Profile_Unload(int player)
     memset(&g_nx2ProfRank[player], 0, sizeof(Nx2RankInfo));
     memset(&s_review[player], 0, sizeof(Nx2Review));
     g_nx2HasProfile[player] = false;
+    memset(&g_nx2Sess[player], 0, sizeof(g_nx2Sess[player]));
+    memset(g_nx2StageInfo[player], 0, sizeof(g_nx2StageInfo[player]));
+}
+
+bool Nx2Profile_CheckUsb(int player)
+{
+    char root[MAX_PATH];
+    return player >= 0 && player <= 1 && profRoot(player, root, sizeof(root));
+}
+
+void Nx2Sess_Start(int player)
+{
+    if (player < 0 || player > 1 || g_nx2Sess[player].active) return;
+    memset(&g_nx2Sess[player], 0, sizeof(g_nx2Sess[player]));
+    g_nx2Sess[player].active = true;
+    g_nx2Sess[player].mileage = 20;   /* CREDIT_MILEAGE */
 }
 
 /* CUsbManager::LoadData: nx2save.bin (Dec + Adler) e depois nx2rank.bin. Arquivo ausente = NODATA;

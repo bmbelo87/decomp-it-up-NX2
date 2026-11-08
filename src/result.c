@@ -830,6 +830,7 @@ void Result_Enter(void) {
             if (p == 0) g_gradeP1 = resGradeOf(r, g_game.stats.missCount[0]);
             else        g_gradeP2 = resGradeOf(r, g_game.stats.missCount[1]);
         }
+        { float rr[2] = { g_stageRatio[0][st], g_stageRatio[1][st] }; int gg[2] = { g_gradeP1, g_gradeP2 }; Nx2Sess_StageDone(st, rr, gg); }   /* dancegrade.cpp:374/417: kcal, VO2, mileage e m_Info[] da sessão */
     }
     s_cheatStage = g_gradeCheat;
     g_gradeCheat = false;

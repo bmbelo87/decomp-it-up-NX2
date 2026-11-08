@@ -129,6 +129,7 @@ typedef enum {
     STATE_STATION         = 0x96, /* Exceed2: CStation — BGA\STATION.DAT (src/station.c) */
     STATE_NX_CLEAR        = 0x98, /* NX WORLD TOUR: MISSIONCLEAR (CMissionClear) — BGA/CONQUEST.MOV (src/nx_mission.c) */
     STATE_NX_USBIN        = 0x9A, /* NX2: entrada do perfil (CUsbin, USB_INPUT) — BGA/USB_*.DAT (src/nx2_usbin.c) */
+    STATE_NX_USBOUT       = 0x9B, /* NX2: saída do perfil (CUsbin em modo USB_OUTPUT) — BGA/USB_REMOVE.DAT (src/nx2_usbout.c) */
     STATE_NX_SPORTS       = 0x99, /* NX: kcal do fim do crédito (CSports) — BGA/SPORTS.DAT (src/nx_sports.c) */
     STATE_NX_MISSION      = 0x97, /* NX WORLD TOUR: objetivo da missão — BGA\MICF.DAT (src/nx_mission.c) */
     STATE_EXIT            = 0xFF,
@@ -262,6 +263,9 @@ void Nx2Select_Update(float dt);
 void Nx2Select_Render(void);
 void NxUsbIn_Update(float dt);   /* nx2_usbin.c */
 void NxUsbIn_Render(void);
+void NxUsbOut_Update(float dt);  /* nx2_usbout.c */
+void NxUsbOut_Render(void);
+void Nx2Sess_StageDone(int stage, const float ratio[2], const int grade[2]);   /* nx2_usbout.c: acumula o estágio na sessão (dancegrade.cpp) */
 void NxSports_Update(float dt);
 void Nx2Sports_Update(float dt);   /* nx2_sports.c: CSports do NX2 (SPORTS.DAT + SPORTS_GRAPH.DAT) */
 void Nx2Sports_Render(void);
@@ -378,6 +382,12 @@ int   Nx2Profile_Save(int player);
 int   Nx2Profile_SaveRank(int player, const Nx2RankUnit info[NX2_MAX_STAGE]);
 bool  Nx2Profile_Create(int player, const char* id);   /* extra do port: cria um perfil novo */
 void  Nx2Profile_Unload(int player);
+bool  Nx2Profile_CheckUsb(int player);        /* CUsbManager::CheckUsb: a raiz do pendrive ainda existe */
+/* dados da sessão atual (g_Player[] do original), transferidos ao perfil na tela USB_OUTPUT */
+typedef struct { bool active; int mileage, kcal, vo2, curRW, curWM; } Nx2Session;
+extern Nx2Session g_nx2Sess[2];
+extern Nx2RankUnit g_nx2StageInfo[2][NX2_MAX_STAGE];   /* g_Player[].m_Info[] */
+void  Nx2Sess_Start(int player);                /* CREDIT_MILEAGE ao entrar (select.cpp:2215) */
 bool  Nx2Rank_Load(Nx2Rank* r);
 bool  Nx2Rank_Save(const Nx2Rank* r);
 bool  Nx2MRank_Load(Nx2MRank* r);

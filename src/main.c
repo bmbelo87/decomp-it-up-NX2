@@ -55,6 +55,7 @@ static void LoadBGAForState(GameState state) {
     case STATE_NAMEINPUT:    bgaName = "085"; break;    /* CNameInput 0x414012: BGA\085.DAT */
     case STATE_IR:           bgaName = "IR"; break;     /* CInternetRanking 0x41371B: BGA\IR.DAT */
     case STATE_NX_USBIN:     bgaName = NULL; break;     /* NX2: carrega as próprias BGAs (nx2_usbin.c) */
+    case STATE_NX_USBOUT:    bgaName = NULL; break;     /* NX2: carrega as próprias BGAs (nx2_usbout.c) */
     case STATE_STATION:      bgaName = NULL; break;     /* NX: usa o COMMON/ARRO que a CTitle deixou (era: "" + STATION.DAT) */
     case STATE_HIGHSCORE:    bgaName = "HIGHSCORE"; break;   /* era "HS" (Exceed); NX: BGA/HIGHSCORE.DAT */     /* CHighscore 0x4126E7: BGA\HS.DAT */     /* CTitle::Begin 0x41C04A: BGA\82.DAT sobre o CREDIT.MOV */
     case STATE_LOGO_ENTER:   bgaName = "81"; break;
@@ -636,6 +637,9 @@ void Game_Update(float dt) {
     case STATE_NX_USBIN:
         NxUsbIn_Update(dt);
         break;
+    case STATE_NX_USBOUT:
+        NxUsbOut_Update(dt);
+        break;
     case STATE_NX_CLEAR:
         if (g_game.stateFrame == 1) NxClear_Enter();
         NxClear_Update(dt);
@@ -791,6 +795,8 @@ void Game_Update(float dt) {
                 BGM_Stop();
                 Game_ResetAllCheats();
                 Render_SetGlobalColor(0, 0, 0, 0);
+                /* fim do crédito (CUsbManager::Clear / ReloadUSBStorageModule do GameOver): o perfil e a sessão não valem para o próximo */
+                Nx2Profile_Unload(0); Nx2Profile_Unload(1);
                 char path[MAX_PATH];
                 snprintf(path, sizeof(path), "%s/BGA/GAMEOVER.MOV", g_game.currentDirectory);
                 Movie_Close();
@@ -1033,6 +1039,7 @@ void Game_Render(void) {
         g_game.state != STATE_NX_CLEAR &&
         g_game.state != STATE_NX_SPORTS &&       /* SPORTS desenha por cena (nx_sports.c) */
         g_game.state != STATE_NX_USBIN &&        /* USBIN desenha por cena (nx2_usbin.c) */
+        g_game.state != STATE_NX_USBOUT &&       /* USBOUT desenha por cena (nx2_usbout.c) */
         g_game.state != STATE_HIGHSCORE &&
         g_game.state != STATE_IR &&
         g_game.state != STATE_NAMEINPUT) {      /* NAMEINPUT desenha por slot (nameinput.c) */             /* IR desenha o próprio BGA (ir.c) */      /* HIGHSCORE desenha por slot (highscore.c) */       /* EXSELECT desenha por slot (select_core.c) */
@@ -1087,6 +1094,9 @@ void Game_Render(void) {
         break;
     case STATE_NX_USBIN:
         NxUsbIn_Render();
+        break;
+    case STATE_NX_USBOUT:
+        NxUsbOut_Render();
         break;
     case STATE_GAMEPLAY:
         if (Movie_IsOpen() && !g_game.cmdTestBGA[0] && !g_game.cmdTestBGA[1])
