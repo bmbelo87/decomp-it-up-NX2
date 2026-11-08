@@ -55,7 +55,9 @@ static const char* s_scene;      /* m_iScenename */
 static BGALayerSrc s_scr[4], s_eff[4], s_txt[4];
 
 static bool both(void) { return (s_active & 3) == 3; }
-static bool locked(void) { return both() && (s_sel == G_TRAINING || s_sel == G_WORLDMAX); }
+/* era: só travava TRAINING/WORLD MAX com os dois jogadores (ou EVENT). Pedido do usuário: ficam sempre inacessíveis
+ * (cena "_lock" + som de erro) */
+static bool locked(void) { return s_sel == G_TRAINING || s_sel == G_WORLDMAX; }
 
 static void setText(void)
 {
@@ -126,7 +128,7 @@ void Nx2Station_Enter(void)
         for (size_t i = 0; i < sizeof(k_done) / sizeof(k_done[0]); i++) BGA_SceneFinish(BG, k_done[i]);
     }
     uint32_t def = Eeprom_Get32(0xECA);                 /* g_Option.g_DefaultStation */
-    s_sel = (def == G_ARCADE || def == G_WORLDMAX || def == G_SPECIAL) ? (int)def : G_TRAINING;
+    s_sel = (def == G_SPECIAL) ? G_SPECIAL : G_ARCADE;   /* era: ARCADE/WORLD MAX/SPECIAL, senão TRAINING */
     s_state = M_NONE; s_selected = false; s_join = false; s_cnt2 = 0; s_phase = 0;
     if (s_ok) {
         setText();
@@ -141,7 +143,7 @@ void Nx2Station_Enter(void)
 
 static void leave(void)
 {
-    if (both() && (s_sel == G_TRAINING || s_sel == G_WORLDMAX)) s_sel = G_ARCADE;
+    if (locked()) s_sel = G_ARCADE;
     static const int k_mode[4] = { 3, 0, 2, 1 };       /* estação -> modo de jogo (mesma tabela da NX) */
     Movie_Close();
     if (s_snd[SN_BGM] >= 0) Audio_Stop(s_snd[SN_BGM]);
@@ -188,7 +190,7 @@ static void processInput(int p)
     }
     if (Input_IsPadHit(p, PAD_C)) {
         if (!s_selected) {
-            if ((s_sel == G_WORLDMAX || s_sel == G_TRAINING) && (both() || g_game.svcGameMode == 1)) {
+            if (locked()) {
                 snd(SN_WRONG, false);
             } else {
                 snd(SN_PUSH, false);
@@ -228,7 +230,7 @@ void Nx2Station_Update(float dt)
         s_state = M_EFF; setText(); reorganize(s_state); setSceneAnimation();
     } else if (s_state == M_EFF && BGA_SceneDone(BG, s_scene)) {
         s_state = M_NONE; setText(); reorganize(s_state); setSceneAnimation();
-    } else if (s_state == M_CLK && both() && (s_sel == G_TRAINING || s_sel == G_WORLDMAX) && BGA_SceneDone(BG, s_scene)) {
+    } else if (s_state == M_CLK && locked() && BGA_SceneDone(BG, s_scene)) {
         s_state = M_NONE; setText(); reorganize(s_state); setSceneAnimation();
     }
     if (BGA_SceneDone(BG, "time")) {                      /* acabou o tempo */
