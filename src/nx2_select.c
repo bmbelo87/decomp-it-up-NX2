@@ -691,19 +691,27 @@ static void changeMode(int p, PadButton b, int dir)       /* BN_7 = anterior, BN
  * Fila de 16 botões por jogador (cmdqueue.cpp): compara o final da fila com cada código na ordem da tabela; o 1º que casa limpa a fila.
  * Teclas: UL=7 UR=9 DL=1 DR=3 C=5. Não portados: skins, SNAKE, HARD JUDGE, APPEAR, DROP, SINK/RISE, +0.5X (sem campo no jogo). */
 enum { CM_SINK, CM_RISE, CM_UA, CM_NX, CM_SNAKE, CM_GRADEREV, CM_RV, CM_RS, CM_XMODE, CM_EW, CM_FREEDOM, CM_ACCEL, CM_DECEL, CM_MIRROR, CM_FLASH, CM_DROP, CM_APPEAR, CM_HARDJ,
+       CM_SK_OLD, CM_SK_CANON, CM_SK_CARD, CM_SK_HWATU, CM_SK_HORSE, CM_SK_EZ, CM_SK_MELODY, CM_SK_SLIME, CM_SK_NXCEL, CM_SK_SHEEP, CM_SK_DOG, CM_SK_GIRL, CM_SK_RND,
        CM_SPEEDUP, CM_SPEEDDOWN, CM_VANISH, CM_CANCEL, CM_COUNT };
 static const char* const k_cmdKeys[CM_COUNT] = {
     "771133995", "117799335", "15151595", "1753917539", "9753197531", "79513315975", "797979795", "797913135", "191937375", "319739175", "719337915", "113377995",
     "331199775", "319731975", "173193795", "719371933", "157359795", "71593717931",
+    /* CmdList1P6 (skins) + 1P_13 (random skin) */
+    "333137915", "791513399", "333137917", "333137919", "111777915", "791513391", "791513393", "791513397", "777111371", "777111375", "999333195", "333999735", "7779991113335",
     "79795", "97975", "79135", "131313" };
 /* LAYER_* da BGA USER_COMMAND (commandLayer.h) */
 enum { LY_2X = 15, LY_3X, LY_4X, LY_8X, LY_AC, LY_DC, LY_EW, LY_RV, LY_V = 24, LY_NS, LY_FD, LY_FL, LY_EXCEED = 38, LY_NX, LY_MIRROR, LY_UA,
-       LY_RS = 43, LY_RG, LY_1X = 47, LY_HG = 63, LY_DROP = 69, LY_SNAKE, LY_APPEAR, LY_SINK, LY_RISE };
+       LY_RS = 43, LY_RG, LY_1X = 47, LY_HG = 63, LY_EZ = 23, LY_NXCEL = 28, LY_OLD = 29, LY_HWATOO, LY_CANON, LY_CARD, LY_SHEEP, LY_HORSE, LY_DOG, LY_GIRL, LY_NOTE = 57, LY_SLIME = 60, LY_RNDSKIN = 75, LY_DROP = 69, LY_SNAKE, LY_APPEAR, LY_SINK, LY_RISE };
 static char    s_cq[2][16];
 static int     s_cspd[2] = { 1, 1 };                       /* 1,2,3,4,8 */
 static int     s_cspec[2];                                 /* 0, 1 = RV, 2 = EW */
 static bool    s_cflag[2][12];                             /* 0 accel 1 decel 2 mirror 3 randomstep 4 flash 5 freedom 6 gradeRev 7 xmode(global) 8 snake 9 sink 10 rise 11 hardjudge */
 static int     s_cvan[2];                                  /* 0, 1 = vanish, 2 = nonstep (V|A), 3 = appear */
+/* skin por jogador (m_CurrentSkin[0]): -1 = padrão do estilo; ordem = CM_SK_OLD..CM_SK_GIRL (player.cpp SkinTable / select.cpp:3493) */
+static int     s_cskin[2] = { -1, -1 };
+static bool    s_crnd[2];                                   /* GAMEMODE_RANDOMSKIN */
+static const int k_skId[12] = { 2, 6, 7, 1, 10, 3, 5, 4, 8, 9, 11, 12 };
+static const int k_skLy[12] = { LY_OLD, LY_CANON, LY_CARD, LY_HWATOO, LY_HORSE, LY_EZ, LY_NOTE, LY_SLIME, LY_NXCEL, LY_SHEEP, LY_DOG, LY_GIRL };
 static bool    s_cua, s_cnx, s_cdrop;                               /* globais (os dois jogadores) */
 typedef struct { int max; BGALayerSrc spr[5]; bool has[5]; int count, cur; uint32_t t0; } CmdIcon;
 static CmdIcon s_ico[5][2];
@@ -749,7 +757,7 @@ static void processCommand(int p, int cm)
 {
     switch (cm) {
     case CM_CANCEL:
-        s_cspd[p] = 1; s_cspec[p] = 0; memset(s_cflag[p], 0, sizeof(s_cflag[p])); s_cvan[p] = 0;
+        s_cspd[p] = 1; s_cspec[p] = 0; memset(s_cflag[p], 0, sizeof(s_cflag[p])); s_cvan[p] = 0; s_cskin[p] = -1; s_crnd[p] = false;
         s_cua = s_cnx = s_cdrop = false; s_cflag[0][7] = s_cflag[1][7] = false;
         for (int g = 0; g < 5; g++) iconClear(&s_ico[g][p]);
         for (int q = 0; q < 2; q++) { iconSet(3, q, -1, 0); iconSet(3, q, -1, 2); iconSet(3, q, -1, 3); iconSet(3, q, -1, 4); iconSet(4, q, -1, 0); iconSet(4, q, -1, 2); }
@@ -805,6 +813,16 @@ static void processCommand(int p, int cm)
         s_cflag[0][7] = s_cflag[1][7] = !s_cflag[p][7];
         for (int q = 0; q < 2; q++) iconSet(3, q, s_cflag[0][7] ? LY_EXCEED : -1, 0);
         break;
+    case CM_SK_OLD: case CM_SK_CANON: case CM_SK_CARD: case CM_SK_HWATU: case CM_SK_HORSE: case CM_SK_EZ:
+    case CM_SK_MELODY: case CM_SK_SLIME: case CM_SK_NXCEL: case CM_SK_SHEEP: case CM_SK_DOG: case CM_SK_GIRL: {
+        int k = cm - CM_SK_OLD;
+        s_cskin[p] = k_skId[k]; s_crnd[p] = false;          /* m_CurrentSkin[0] = n; limpa RANDOMSKIN */
+        iconSet(2, p, k_skLy[k], 0);
+        break; }
+    case CM_SK_RND:
+        s_cskin[p] = 0; s_crnd[p] = !s_crnd[p];            /* m_CurrentSkin[0] = 0; ^= RANDOMSKIN */
+        iconSet(2, p, s_crnd[p] ? LY_RNDSKIN : -1, 0);
+        break;
     case CM_UA:
         s_cua = !s_cua;
         for (int q = 0; q < 2; q++) iconSet(3, q, s_cua ? LY_UA : -1, 2);
@@ -822,7 +840,7 @@ static void cmdSessionInit(void)
     iconInit();
     memset(s_cq, 0, sizeof(s_cq));
     if (g_game.stageCount == 3 || g_game.svcGameMode == 1) {      /* códigos valem pela sessão: zera no 1º estágio */
-        for (int p = 0; p < 2; p++) { s_cspd[p] = 1; s_cspec[p] = 0; memset(s_cflag[p], 0, sizeof(s_cflag[p])); s_cvan[p] = 0; }
+        for (int p = 0; p < 2; p++) { s_cspd[p] = 1; s_cspec[p] = 0; memset(s_cflag[p], 0, sizeof(s_cflag[p])); s_cvan[p] = 0; s_cskin[p] = -1; s_crnd[p] = false; }
         s_cua = s_cnx = s_cdrop = false;
     }
     else {                                                        /* estágios seguintes: refaz os ícones dos códigos ativos */
@@ -842,6 +860,8 @@ static void cmdSessionInit(void)
             if (s_cflag[p][3]) iconSet(3, p, LY_RS, 1);
             if (s_cflag[p][7]) iconSet(3, p, LY_EXCEED, 0);
             if (s_cua) iconSet(3, p, LY_UA, 2);
+            if (s_crnd[p]) iconSet(2, p, LY_RNDSKIN, 0);
+            else for (int k = 0; k < 12; k++) if (s_cskin[p] == k_skId[k]) iconSet(2, p, k_skLy[k], 0);
             if (s_cflag[p][6]) iconSet(4, p, LY_RG, 1);
             if (s_cflag[p][11]) iconSet(4, p, LY_HG, 3);
             if (s_cnx) iconSet(4, p, LY_NX, 0);
@@ -875,6 +895,8 @@ static void commandsToGame(int speed[2], bool rv[2])
 {
     g_game.cmdDrop = s_cdrop;
     for (int p = 0; p < 2; p++) {
+        /* NX2 playengine.cpp:1253: RANDOMSKIN sorteia rand() % (strlen(SkinParamTable) - 1) = 0..18 */
+        Skin_SetIndexP(p, s_crnd[p] ? rand() % 19 : (s_cskin[p] >= 0 ? s_cskin[p] : Skin_Default()));
         speed[p] = s_cspd[p]; rv[p] = (s_cspec[p] == 1);
         g_game.cmdEarthworm[p] = (s_cspec[p] == 2);
         g_game.cmdAccel[p] = s_cflag[p][0]; g_game.cmdDecel[p] = s_cflag[p][1];

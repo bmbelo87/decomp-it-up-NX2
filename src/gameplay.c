@@ -934,7 +934,7 @@ static void skinLoad(int sk)   /* era: (void), sk = Skin_Index() */
      * SKIN01..07 = os mesmos valores do Zero; SKIN00 e SKIN08 diferem.
      * Os campos P1/P2 batem com o x_start_interpolate da NX2 (SKIN00 = {0, 1}).
      * Antes: k_skinOffOld[sk & 7] — o SKIN08 (skin padrão da NX) usava o SKIN00 do Zero. */
-    static const struct { float x[5], y, f1, f2; } k_nx[9] = {
+    static const struct { float x[5], y, f1, f2; } k_nx[19] = {
         { {  2,  0, -1,  1, -1 }, -1,  0, 1 },   /* SKIN00 */
         { {  1,  0,  0,  2,  0 },  0,  0, 0 },   /* SKIN01 */
         { {  3,  2,  0, -2, -3 },  0,  0, 0 },   /* SKIN02 */
@@ -944,6 +944,16 @@ static void skinLoad(int sk)   /* era: (void), sk = Skin_Index() */
         { { -2, -4, -5, -5, -6 }, -4,  0, 9 },   /* SKIN06 */
         { {  2,  1,  0,  0,  0 },  0, -1, 0 },   /* SKIN07 */
         { {  2,  0, -1,  1, -1 }, -1,  0, 1 },   /* SKIN08 (NX) */
+        { {  0,  0,  0,  0,  0 },  0,  0, 1 },   /* SKIN09 (NX2: x_start_interpolate {0,1}, offsets por coluna não conferidos) */
+        { {  0,  0,  0,  0,  0 },  0,  0, 1 },   /* SKIN10 (NX2: x_start_interpolate {0,1}, offsets por coluna não conferidos) */
+        { {  0,  0,  0,  0,  0 },  0,  0, 1 },   /* SKIN11 (NX2: x_start_interpolate {0,1}, offsets por coluna não conferidos) */
+        { {  0,  0,  0,  0,  0 },  0,  0, 1 },   /* SKIN12 (NX2: x_start_interpolate {0,1}, offsets por coluna não conferidos) */
+        { {  0,  0,  0,  0,  0 },  0,  0, 1 },   /* SKIN13 (NX2: x_start_interpolate {0,1}, offsets por coluna não conferidos) */
+        { {  0,  0,  0,  0,  0 },  0,  0, 1 },   /* SKIN14 (NX2: x_start_interpolate {0,1}, offsets por coluna não conferidos) */
+        { {  0,  0,  0,  0,  0 },  0,  0, 1 },   /* SKIN15 (NX2: x_start_interpolate {0,1}, offsets por coluna não conferidos) */
+        { {  0,  0,  0,  0,  0 },  0,  0, 1 },   /* SKIN16 (NX2: x_start_interpolate {0,1}, offsets por coluna não conferidos) */
+        { {  0,  0,  0,  0,  0 },  0,  0, 1 },   /* SKIN17 (NX2: x_start_interpolate {0,1}, offsets por coluna não conferidos) */
+        { {  0,  0,  0,  0,  0 },  0,  0, 1 },   /* SKIN18 (NX2: x_start_interpolate {0,1}, offsets por coluna não conferidos) */
     };
     (void)k_skinOffOld;   /* tabela do Zero mantida como referência */
     for (int k = 0; k < 5; k++) g_skinTap[k] = g_skinL1[k] = g_skinL2[k] = g_skinL3[k] = -1;
@@ -964,7 +974,7 @@ static void skinLoad(int sk)   /* era: (void), sk = Skin_Index() */
             *dst[j] = (g_game.sprTileCount > start) ? start : -1;
         }
         /* Exceed2: g_skinOffX[k] = k_off[sk][k]; */
-        g_skinOffX[k] = k_nx[(sk >= 0 && sk < 9) ? sk : 8].x[k];
+        g_skinOffX[k] = k_nx[(sk >= 0 && sk < 19) ? sk : 8].x[k];
     }
     /* 0x80806f0: arrowp.spr (efeito de pisar, 5 tiles: DL UL C UR DR) */
     {
@@ -980,9 +990,9 @@ static void skinLoad(int sk)   /* era: (void), sk = Skin_Index() */
         SPR_LoadSPR(nm, NULL, NULL, NULL);
         g_skinSpark[k] = (g_game.sprTileCount > start) ? start : -1;
     }
-    g_skinOffY = k_nx[(sk >= 0 && sk < 9) ? sk : 8].y;
-    g_skinFieldX[0] = k_nx[(sk >= 0 && sk < 9) ? sk : 8].f1;
-    g_skinFieldX[1] = k_nx[(sk >= 0 && sk < 9) ? sk : 8].f2;
+    g_skinOffY = k_nx[(sk >= 0 && sk < 19) ? sk : 8].y;
+    g_skinFieldX[0] = k_nx[(sk >= 0 && sk < 19) ? sk : 8].f1;
+    g_skinFieldX[1] = k_nx[(sk >= 0 && sk < 19) ? sk : 8].f2;
     RES_Close();
     Log_Print("GP: skin SKIN%02d carregada (nota DL=%d)\n", sk, g_skinTap[0]);
 }
