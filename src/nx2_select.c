@@ -691,19 +691,20 @@ static void changeMode(int p, PadButton b, int dir)       /* BN_7 = anterior, BN
  * Fila de 16 botões por jogador (cmdqueue.cpp): compara o final da fila com cada código na ordem da tabela; o 1º que casa limpa a fila.
  * Teclas: UL=7 UR=9 DL=1 DR=3 C=5. Não portados: skins, SNAKE, HARD JUDGE, APPEAR, DROP, SINK/RISE, +0.5X (sem campo no jogo). */
 enum { CM_SINK, CM_RISE, CM_UA, CM_NX, CM_SNAKE, CM_GRADEREV, CM_RV, CM_RS, CM_XMODE, CM_EW, CM_FREEDOM, CM_ACCEL, CM_DECEL, CM_MIRROR, CM_FLASH, CM_DROP, CM_APPEAR, CM_HARDJ,
-       CM_SK_OLD, CM_SK_CANON, CM_SK_CARD, CM_SK_HWATU, CM_SK_HORSE, CM_SK_EZ, CM_SK_MELODY, CM_SK_SLIME, CM_SK_NXCEL, CM_SK_SHEEP, CM_SK_DOG, CM_SK_GIRL, CM_SK_RND,
+       CM_SK_OLD, CM_SK_CANON, CM_SK_CARD, CM_SK_HWATU, CM_SK_HORSE, CM_SK_EZ, CM_SK_MELODY, CM_SK_SLIME, CM_SK_NXCEL, CM_SK_SHEEP, CM_SK_DOG, CM_SK_GIRL, CM_SK_RND, CM_HALF,
        CM_SPEEDUP, CM_SPEEDDOWN, CM_VANISH, CM_CANCEL, CM_COUNT };
 static const char* const k_cmdKeys[CM_COUNT] = {
     "771133995", "117799335", "15151595", "1753917539", "9753197531", "79513315975", "797979795", "797913135", "191937375", "319739175", "719337915", "113377995",
     "331199775", "319731975", "173193795", "719371933", "157359795", "71593717931",
     /* CmdList1P6 (skins) + 1P_13 (random skin) */
-    "333137915", "791513399", "333137917", "333137919", "111777915", "791513391", "791513393", "791513397", "777111371", "777111375", "999333195", "333999735", "7779991113335",
+    "333137915", "791513399", "333137917", "333137919", "111777915", "791513391", "791513393", "791513397", "777111371", "777111375", "999333195", "333999735", "7779991113335", "779977995",
     "79795", "97975", "79135", "131313" };
 /* LAYER_* da BGA USER_COMMAND (commandLayer.h) */
 enum { LY_2X = 15, LY_3X, LY_4X, LY_8X, LY_AC, LY_DC, LY_EW, LY_RV, LY_V = 24, LY_NS, LY_FD, LY_FL, LY_EXCEED = 38, LY_NX, LY_MIRROR, LY_UA,
-       LY_RS = 43, LY_RG, LY_1X = 47, LY_HG = 63, LY_EZ = 23, LY_NXCEL = 28, LY_OLD = 29, LY_HWATOO, LY_CANON, LY_CARD, LY_SHEEP, LY_HORSE, LY_DOG, LY_GIRL, LY_NOTE = 57, LY_SLIME = 60, LY_RNDSKIN = 75, LY_DROP = 69, LY_SNAKE, LY_APPEAR, LY_SINK, LY_RISE };
+       LY_RS = 43, LY_RG, LY_1X = 47, LY_05X = 46, LY_5X = 48, LY_6X = 49, LY_HG = 63, LY_EZ = 23, LY_NXCEL = 28, LY_OLD = 29, LY_HWATOO, LY_CANON, LY_CARD, LY_SHEEP, LY_HORSE, LY_DOG, LY_GIRL, LY_NOTE = 57, LY_SLIME = 60, LY_RNDSKIN = 75, LY_DROP = 69, LY_SNAKE, LY_APPEAR, LY_SINK, LY_RISE };
 static char    s_cq[2][16];
-static int     s_cspd[2] = { 1, 1 };                       /* 1,2,3,4,8 */
+static int     s_cspd[2] = { 1, 1 };                       /* 1,2,3,4,8 (MODDED: 5 e 6 também) */
+static bool    s_chalf[2];                                 /* +0.5X (eSpeedHalf), só MODDED */
 static int     s_cspec[2];                                 /* 0, 1 = RV, 2 = EW */
 static bool    s_cflag[2][12];                             /* 0 accel 1 decel 2 mirror 3 randomstep 4 flash 5 freedom 6 gradeRev 7 xmode(global) 8 snake 9 sink 10 rise 11 hardjudge */
 static int     s_cvan[2];                                  /* 0, 1 = vanish, 2 = nonstep (V|A), 3 = appear */
@@ -750,31 +751,51 @@ static void iconInit(void)
 {
     for (int g = 0; g < 5; g++) for (int p = 0; p < 2; p++) { s_ico[g][p].max = k_icoMax[g]; iconClear(&s_ico[g][p]); }
 }
-static int speedLy(int v) { return v == 2 ? LY_2X : v == 3 ? LY_3X : v == 4 ? LY_4X : v == 8 ? LY_8X : -1; }
-static void speedIcon(int p) { iconSet(0, p, s_cspd[p] > 1 ? speedLy(s_cspd[p]) : -1, 0); }
+static int speedLy(int v) { return v == 2 ? LY_2X : v == 3 ? LY_3X : v == 4 ? LY_4X : v == 5 ? LY_5X : v == 6 ? LY_6X : v == 8 ? LY_8X : -1; }
+static void speedIcon(int p)
+{
+    iconSet(0, p, s_cspd[p] > 1 ? speedLy(s_cspd[p]) : (s_chalf[p] ? LY_1X : -1), 0);   /* com +0.5X em 1X mostra o ícone 1X */
+    if (s_chalf[p]) iconSet(0, p, LY_05X, 1);
+}
+/* ciclo de velocidade: MODDED 1,2,3,4,5,6,8 (select.cpp:3236 ALL_SKINS); VANILLA 1,2,3,4,8 */
+static int speedNext(int v, int dir)
+{
+    static const int m[7] = { 1, 2, 3, 4, 5, 6, 8 }, c[5] = { 1, 2, 3, 4, 8 };
+    const int* t = g_game.gameStyleModded ? m : c; int n = g_game.gameStyleModded ? 7 : 5, i = 0;
+    for (int k = 0; k < n; k++) if (t[k] <= v) i = k;
+    if (dir > 0) return i + 1 < n ? t[i + 1] : t[0];
+    return i > 0 ? t[i - 1] : t[n - 1];
+}
 
 static void processCommand(int p, int cm)
 {
     switch (cm) {
     case CM_CANCEL:
-        s_cspd[p] = 1; s_cspec[p] = 0; memset(s_cflag[p], 0, sizeof(s_cflag[p])); s_cvan[p] = 0; s_cskin[p] = -1; s_crnd[p] = false;
+        s_cspd[p] = 1; s_chalf[p] = false; s_cspec[p] = 0; memset(s_cflag[p], 0, sizeof(s_cflag[p])); s_cvan[p] = 0; s_cskin[p] = -1; s_crnd[p] = false;
         s_cua = s_cnx = s_cdrop = false; s_cflag[0][7] = s_cflag[1][7] = false;
         for (int g = 0; g < 5; g++) iconClear(&s_ico[g][p]);
         for (int q = 0; q < 2; q++) { iconSet(3, q, -1, 0); iconSet(3, q, -1, 2); iconSet(3, q, -1, 3); iconSet(3, q, -1, 4); iconSet(4, q, -1, 0); iconSet(4, q, -1, 2); }
         break;
     case CM_SPEEDUP:
         if (s_cspec[p]) { s_cspec[p] = 0; s_cspd[p] = 1; }
-        else s_cspd[p] = s_cspd[p] >= 8 ? 1 : s_cspd[p] >= 4 ? 8 : s_cspd[p] + 1;
+        else s_cspd[p] = speedNext(s_cspd[p], +1);
         iconSet(0, p, -1, 0); speedIcon(p);
         break;
     case CM_SPEEDDOWN:
         if (s_cspec[p]) { s_cspec[p] = 0; s_cspd[p] = 1; }
-        else s_cspd[p] = s_cspd[p] >= 8 ? 4 : s_cspd[p] > 1 ? s_cspd[p] - 1 : 8;
+        else s_cspd[p] = (!g_game.gameStyleModded && s_cspd[p] >= 8) ? 4 : speedNext(s_cspd[p], -1);   /* VANILLA 8 -> 4 (como antes) */
         iconSet(0, p, -1, 0); speedIcon(p);
+        break;
+    case CM_HALF:                                           /* só MODDED (+0.5X não existe nas skins/ALL_SKINS vanilla do port) */
+        if (g_game.gameStyleModded) {
+            if (s_cspec[p]) { s_cspec[p] = 0; s_cspd[p] = 1; }
+            s_chalf[p] = !s_chalf[p];
+            iconSet(0, p, -1, 0); iconSet(0, p, -1, 1); speedIcon(p);
+        }
         break;
     case CM_RV: case CM_EW: {
         int k = (cm == CM_RV) ? 1 : 2;
-        s_cspd[p] = 1; s_cspec[p] = (s_cspec[p] == k) ? 0 : k;
+        s_cspd[p] = 1; s_chalf[p] = false; s_cspec[p] = (s_cspec[p] == k) ? 0 : k;   /* RV/EW desligam o +0.5X */
         iconSet(0, p, s_cspec[p] ? (k == 1 ? LY_RV : LY_EW) : -1, 0); iconSet(0, p, -1, 1);
         break; }
     case CM_ACCEL: case CM_DECEL: {
@@ -840,7 +861,7 @@ static void cmdSessionInit(void)
     iconInit();
     memset(s_cq, 0, sizeof(s_cq));
     if (g_game.stageCount == 3 || g_game.svcGameMode == 1) {      /* códigos valem pela sessão: zera no 1º estágio */
-        for (int p = 0; p < 2; p++) { s_cspd[p] = 1; s_cspec[p] = 0; memset(s_cflag[p], 0, sizeof(s_cflag[p])); s_cvan[p] = 0; s_cskin[p] = -1; s_crnd[p] = false; }
+        for (int p = 0; p < 2; p++) { s_cspd[p] = 1; s_chalf[p] = false; s_cspec[p] = 0; memset(s_cflag[p], 0, sizeof(s_cflag[p])); s_cvan[p] = 0; s_cskin[p] = -1; s_crnd[p] = false; }
         s_cua = s_cnx = s_cdrop = false;
     }
     else {                                                        /* estágios seguintes: refaz os ícones dos códigos ativos */
@@ -897,7 +918,7 @@ static void commandsToGame(int speed[2], bool rv[2])
     for (int p = 0; p < 2; p++) {
         /* NX2 playengine.cpp:1253: RANDOMSKIN sorteia rand() % (strlen(SkinParamTable) - 1) = 0..18 */
         Skin_SetIndexP(p, s_crnd[p] ? rand() % 19 : (s_cskin[p] >= 0 ? s_cskin[p] : Skin_Default()));
-        speed[p] = s_cspd[p]; rv[p] = (s_cspec[p] == 1);
+        speed[p] = (s_cspd[p] > 4 && s_cspd[p] < 8) ? 4 : s_cspd[p]; rv[p] = (s_cspec[p] == 1);
         g_game.cmdEarthworm[p] = (s_cspec[p] == 2);
         g_game.cmdAccel[p] = s_cflag[p][0]; g_game.cmdDecel[p] = s_cflag[p][1];
         g_game.cmdMirror[p] = s_cflag[p][2]; g_game.cmdRandomStep[p] = s_cflag[p][3];
@@ -948,7 +969,11 @@ static void launch(void)
     if (g_nx2Opt.g_PlayCountPerTrack[s_list[s_cur]] < 0x7FFFFFFF) g_nx2Opt.g_PlayCountPerTrack[s_list[s_cur]]++;
     Render_SetGlobalColor(0, 0, 0, 0);
     commandsToGame(speed, rv);
-    if (!Select_StartSong((int)e->id, s_mode[0], s_active, speed, rv)) {
+    bool started = Select_StartSong((int)e->id, s_mode[0], s_active, speed, rv);
+    if (started && g_game.gameStyleModded)       /* Select_StartSong zera cmdSpeedNx: 5X, 6X e +0.5X vão em quartos (eSpeedNormal = 4, eSpeedHalf = +2) */
+        for (int p = 0; p < 2; p++)
+            g_game.cmdSpeedNx[p] = (s_cspec[p] == 0 && (s_cspd[p] > 4 && s_cspd[p] < 8 || s_chalf[p])) ? s_cspd[p] * 4 + (s_chalf[p] ? 2 : 0) : 0;
+    if (!started) {
         Log_Print("NX2SELECT: Select_StartSong falhou" "%c", 10);
         s_end = s_endStarted = false; s_phase = 1; s_endCnt = 0;
     }
