@@ -973,6 +973,7 @@ void Gamestate_UpdateWarning(float dt);
 void Gamestate_UpdateLogo(float dt);
 void Gamestate_UpdateIntro(float dt);
 void Gamestate_RenderIntro(void);
+void Title_PlayMusic(void);         /* TITLE.WAV em loop (volta do USB_INPUT na entrada tardia) */
 void Title_StopMusic(void);         /* Zero: para o EFF_TITLE (WAVE/TITLE.WAV) */
 unsigned Title_GetJoinedMask(void); /* intro.c — [0x568FF4] bits 0/1 */
 void Title_SetJoinedMask(unsigned m);

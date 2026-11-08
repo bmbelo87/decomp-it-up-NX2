@@ -48,7 +48,7 @@ static bool    s_ok;
 static int     s_phase;          /* 0 intro, 1 seleção, 2 saída (fade), 3 saída para o USB_INPUT */
 static int     s_state;          /* m_iCurrentState */
 static int     s_sel;            /* m_iCurrentSelected */
-static bool    s_selected, s_join;
+static bool    s_selected, s_join, s_into;
 static int     s_cnt2;
 static unsigned s_active;
 static const char* s_scene;      /* m_iScenename */
@@ -105,6 +105,8 @@ void Nx2Station_Enter(void)
     Resource_ClearBGA();
     s_ok = Resource_LoadBGAByName("SELECT_STATION");
     if (!s_ok) Log_Print("NX2STATION: falha ao carregar BGA\\SELECT_STATION.DAT\n");
+    s_into = s_ok && Resource_LoadBGAByName("USB_INTO_OTHER_PLAYER");   /* animação de entrada tardia (índice 1) */
+    if (!s_into) Log_Print("NX2STATION: falha ao carregar BGA\\USB_INTO_OTHER_PLAYER.DAT\n");
     BGA_Reset();
 
     if (!s_sndInit) {
@@ -155,11 +157,13 @@ static void processInput(int p)
         if (Input_IsPadHit(p, PAD_C) && Coin_HasCredit()) {
             Coin_ConsumeCredit();
             snd(SN_JOIN, false);
+            if (s_snd[SN_BGM] >= 0) Audio_Stop(s_snd[SN_BGM]);   /* a música de fundo para na hora da entrada */
             s_selected = false;
             s_join = true;
             s_active |= (1u << p);
             Title_SetJoinedMask(Title_GetJoinedMask() | (1u << p));
             BGA_SceneReset(BG, "2player_in");
+            if (s_into) BGA_SceneReset(1, "USB_INTO_OTHER_PLAYER");
             reorganize(s_state);
             setSceneAnimation();
         }
@@ -235,10 +239,11 @@ void Nx2Station_Update(float dt)
     }
     processInput(0);
     processInput(1);
-    if (s_join && BGA_SceneDone(BG, "2player_in")) {      /* Next(true): volta ao USB_INPUT para ler o perfil */
+    if (s_join && BGA_SceneDone(BG, "2player_in") && (!s_into || BGA_SceneDone(1, "USB_INTO_OTHER_PLAYER"))) {      /* Next(true): volta ao USB_INPUT para ler o perfil */
         Movie_Close();
         if (s_snd[SN_BGM] >= 0) Audio_Stop(s_snd[SN_BGM]);
         Title_SetJoinedMask(s_active);
+        Title_PlayMusic();                                /* USB_INPUT da entrada tardia: música do TITLE */
         s_phase = 3;
         Game_ChangeState(STATE_NX_USBIN);
     }
@@ -267,4 +272,7 @@ void Nx2Station_Render(void)
     BGA_ScenePlay(BG, "arrow_down_right", true);
     BGA_ScenePlay(BG, s_scene, true);
     if (s_join) BGA_ScenePlay(BG, "2player_in", true);
+    if (s_join && s_into) {
+        BGA_ScenePlay(1, "USB_INTO_OTHER_PLAYER", true);
+    }
 }

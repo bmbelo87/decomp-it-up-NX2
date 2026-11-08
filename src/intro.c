@@ -179,6 +179,11 @@ static int g_titleMusic = -1;   /* EFF_TITLE */
 void Title_StopMusic(void) {
     if (g_titleMusic >= 0) Audio_Stop(g_titleMusic);
 }
+/* entrada tardia do P2: o USB_INPUT volta com a música do TITLE (WAVE/TITLE.WAV) em loop */
+void Title_PlayMusic(void) {
+    if (g_titleMusic < 0) g_titleMusic = Audio_LoadWaveFile("TITLE.WAV");
+    if (g_titleMusic >= 0) { Audio_Stop(g_titleMusic); Audio_Play(g_titleMusic, true); }
+}
 
 static void intro_open(const char* rel, bool loop) {
     char path[MAX_PATH];
