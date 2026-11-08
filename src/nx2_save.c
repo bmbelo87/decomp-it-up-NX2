@@ -33,6 +33,7 @@ Nx2Option  g_nx2Opt;
 Nx2Stat    g_nx2Prof[2];
 Nx2RankInfo g_nx2ProfRank[2];
 bool       g_nx2HasProfile[2];
+char       g_nx2UsbRoot[2][260];   /* g_Option.usbBus (SETUP USB DRIVE); no PC é a raiz do drive escolhido (ex. "E:\") */
 static Nx2Review s_review[2];
 
 static uint32_t nx2Adler(const uint8_t* d, size_t n)
@@ -198,6 +199,7 @@ static bool profRoot(int player, char* out, size_t n)
     snprintf(env, sizeof(env), "NX2_USB%d", player);
     const char* e = getenv(env);
     if (e && *e) snprintf(out, n, "%s", e);
+    else if (player >= 0 && player < 2 && g_nx2UsbRoot[player][0]) snprintf(out, n, "%s", g_nx2UsbRoot[player]);   /* USB DRIVE do service */
     else snprintf(out, n, "%s/save/usb%d", g_game.currentDirectory, player);
     char probe[MAX_PATH + 16];
     snprintf(probe, sizeof(probe), "%s/.", out);

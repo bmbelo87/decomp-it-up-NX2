@@ -46,6 +46,15 @@ static bool loadIni(bool all)
         if (sscanf(line, "GameMode=%d",    &v) == 1) g_game.svcGameMode      = v;
         if (sscanf(line, "DemoSound=%d",   &v) == 1) g_game.svcDemoSound     = v;
         if (sscanf(line, "LangOption=%d",  &v) == 1) g_game.svcLangOption    = v;
+        for (int up = 0; up < 2; up++) {   /* USB DRIVE do service (usbBus[up]) */
+            char key[16], val[260];
+            snprintf(key, sizeof(key), "UsbRoot%d=", up);
+            if (!strncmp(line, key, strlen(key))) {
+                snprintf(val, sizeof(val), "%s", line + strlen(key));
+                val[strcspn(val, "\r\n")] = 0;
+                snprintf(g_nx2UsbRoot[up], sizeof(g_nx2UsbRoot[up]), "%s", val);
+            }
+        }
         if (sscanf(line, "Coin1=%d",       &v) == 1) g_game.svcCoin1         = v;
         if (sscanf(line, "Coin2=%d",       &v) == 1) g_game.svcCoin2         = v;
         if (sscanf(line, "CoinTotal=%d",   &v) == 1) g_game.svcCoinTotal     = v;
@@ -68,6 +77,8 @@ void GameOption_Save(void)
     if (f) {
         fprintf(f, "[GameOption]\n");
         fprintf(f, "AudioOffset=%d\n", g_game.audioOffsetMs);
+        fprintf(f, "UsbRoot0=%s\n", g_nx2UsbRoot[0]);
+        fprintf(f, "UsbRoot1=%s\n", g_nx2UsbRoot[1]);
         fprintf(f, "[Graphics]\n");
         fprintf(f, "Fullscreen=%d\n", (int)g_game.isFullscreen);
         fprintf(f, "Resolution=%d\n", g_game.gfxResIdx);

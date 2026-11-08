@@ -366,6 +366,7 @@ extern Nx2Option g_nx2Opt;                   /* PIUNX2.INI em memória */
 extern Nx2Stat   g_nx2Prof[2];               /* perfis (nx2save.bin) em memória */
 extern Nx2RankInfo g_nx2ProfRank[2];         /* nx2rank.bin em memória */
 extern bool      g_nx2HasProfile[2];         /* CUsbManager::HasUsb */
+extern char      g_nx2UsbRoot[2][260];       /* g_Option.usbBus[2] (SETUP USB DRIVE): raiz do pendrive do jogador; vazio = pasta padrão */
 bool  Nx2Option_Load(void);                  /* false = ausente/inválido (g_nx2Opt fica zerado) */
 bool  Nx2Option_Save(void);
 Nx2Stat* Nx2_Stat(int player);               /* perfil se ativo, senão g_nx2Opt.m_Stat (g_Option.m_Stat) */

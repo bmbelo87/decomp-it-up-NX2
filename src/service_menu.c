@@ -95,6 +95,7 @@ static const float SVC_PALETTE[7][3] = {
 #define SVC_PAGE_GRAPHICS 11
 #define SVC_PAGE_BUTTON_CONFIG 12
 #define SVC_PAGE_RESTRICT 14   /* extra do port: RESTRICTION */
+#define SVC_PAGE_USB 15        /* NX2: SETUP_MENU_USBBUS "USB DRIVE" (setup.cpp:1982) */
 static int  g_svcPage;
 static int  g_svcOption;
 static int  g_svcCursor;
@@ -286,7 +287,7 @@ static void svcRenderFooter(void)
     switch (g_svcPage) {
     case 4: case 5:
         break;
-    case 0: case 6: case 7: case 10: case 13: case SVC_PAGE_GRAPHICS: case SVC_PAGE_BUTTON_CONFIG:
+    case 0: case 6: case 7: case 10: case 13: case SVC_PAGE_GRAPHICS: case SVC_PAGE_BUTTON_CONFIG: case SVC_PAGE_USB:
         svcText(236.0f, 36.0f, "MOVE   - TEST / UP / DOWN BUTTON");
         svcText(236.0f, 16.0f, "SELECT - SERVICE BUTTON");
         break;
@@ -325,6 +326,7 @@ static const struct { const char* name; int page; } SVC_TOP[] = {
     { "SCREEN TEST",       3 },
     { "GAME SETTING",      4 },
     { "COIN SETTING",      5 },
+    { "USB DRIVE",         SVC_PAGE_USB },   /* NX2 SETUP_COMMON.LUA: SETUP_MENU_USBBUS entre COIN SETTING e SOUND TEST */
     { "SOUND TEST",        6 },
     { "BOOKKEEPING",       7 },
     { "STATISTICS",        8 },
@@ -402,6 +404,55 @@ static void svcRenderMain(void)
     }
 }
 /* era (Prex3): itens SVC_MAIN_ITEMS com EEPROM TEST e "Lock OK = 0 Err = 0" */
+
+/* ------------------------------------------------------------ USB DRIVE
+ * _SETUP_USBBUS (nx2src setup.cpp:1982): PLAYER 1, PLAYER 2, EXIT; TEST move, SERVICE no jogador
+ * chama GetUsbSerial(usbBus[i]) e guarda o endereço bus:dev do pendrive (mostrado "%02d:%02d" ou "---").
+ * Adaptação do PC (HIPÓTESE, não existe no original): não há bus:dev; SERVICE percorre
+ * "---" (pasta padrão save/usb<N>) e os drives removíveis presentes ("E:"). O valor vai para g_nx2UsbRoot
+ * (nx2_save.c profRoot) e é gravado no ini ao sair pelo EXIT. */
+static void svcUsbCycle(int p)
+{
+    char opts[27][8];
+    int n = 0, cur = 0;
+    opts[n++][0] = 0;
+#ifdef _WIN32
+    DWORD mask = GetLogicalDrives();
+    for (int i = 0; i < 26; i++) {
+        char r[4] = { (char)('A' + i), ':', '\\', 0 };
+        if (!(mask & (1u << i))) continue;
+        if (GetDriveTypeA(r) != DRIVE_REMOVABLE) continue;
+        snprintf(opts[n++], sizeof(opts[0]), "%s", r);
+    }
+#endif
+    for (int i = 0; i < n; i++)
+        if (!strcmp(opts[i], g_nx2UsbRoot[p])) cur = i;
+    snprintf(g_nx2UsbRoot[p], sizeof(g_nx2UsbRoot[p]), "%s", opts[(cur + 1) % n]);
+}
+
+static void svcRenderUsbDrive(void)
+{
+    uint32_t hit = svcBitsHit();
+
+    svcColor(SVC_NORMAL);
+    svcText(276.0f, 428.0f, "USB DRIVE");
+    for (int i = 0; i < 3; i++) {
+        float y = (float)(352 - i * 20);
+        svcColorFor(i, g_svcCursor);
+        svcText(196.0f, y, i == 0 ? "PLAYER 1" : i == 1 ? "PLAYER 2" : "EXIT");
+        if (i < 2) {
+            char v[8];
+            snprintf(v, sizeof(v), "%.2s", g_nx2UsbRoot[i]);
+            svcText(404.0f, y, v[0] ? v : "---");
+        }
+    }
+    if (hit & SVC_BIT_TEST)         g_svcCursor = (g_svcCursor + 1) % 3;
+    else if (hit & SVC_BIT_UP)      g_svcCursor = (g_svcCursor + 2) % 3;
+    if (hit & SVC_BIT_SERVICE) {
+        if (g_svcCursor < 2) svcUsbCycle(g_svcCursor);
+        else { GameOption_Save(); g_svcPage = 0; }
+    }
+}
 
 /* ------------------------------------------------------------ RESTRICTION
  * Extra do port (o original só tem o título SETUP_RESTRICT_TITLE e a tabela
@@ -1724,6 +1775,7 @@ void ServiceMenu_UpdateRender(void)
     case SVC_PAGE_GRAPHICS:      svcRenderGraphics();      svcRenderFooter(); break;
     case SVC_PAGE_BUTTON_CONFIG: svcRenderButtonConfig();  svcRenderFooter(); break;
     case SVC_PAGE_RESTRICT:      svcRenderRestrict();      svcRenderFooter(); break;
+    case SVC_PAGE_USB:           svcRenderUsbDrive();      svcRenderFooter(); break;
     default: svcRenderFooter(); break;
     }
 }
