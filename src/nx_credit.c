@@ -15,14 +15,13 @@
  * de todas. As texturas também são apagadas na limpeza; g_texGeneration avisa
  * quando é preciso recarregar.
  *
- * Posições (credit.bga, BGA3: x,y = centro da extensão do SPR, Y para baixo):
- *   slot 0  credit01.spr (322,470)   slot 1..3  dígitos (339|359|378, 468)
- *   slot 4  credit02.spr (322,470)   slot 5..8  dígitos (333|345|367|387, 468)
- *   slot 9  freeplay.spr (322,469)   slot 10    event.spr (320,467)
- *   slot 11 demoplay.spr (128,440) escala 0.8   slot 12 demoplay.spr (512,440) escala 0.8
- * Cor (keyframes +0x2C..+0x38, r g b a): crédito e dígitos (1,1,1); freeplay e event
- *   (1,1,0.5); demoplay (1,1,0) = amarelo. Sem animação: os dois keyframes de cada
- *   slot são iguais, e o NX2 só chama DrawScene.
+ * Posições (credit.bga do NX2, BGA3: x,y = centro da extensão do SPR, Y para baixo):
+ *   slot 0  credit01.spr (322,463)   slot 1..3  dígitos (334|354|374, 463)
+ *   slot 4  credit02.spr (322,463)   slot 5..8  dígitos (327|337|357|378, 463)
+ *   slot 9  freeplay.spr (322,463)   slot 10    event.spr (320,460)
+ *   slot 11 demoplay.spr (128,460) escala 0.8   slot 12 demoplay.spr (512,460) escala 0.8
+ * Cor (keyframes +0x2C..+0x38, r g b a): tudo (1,1,1) menos demoplay (1,1,0.75). Sem
+ *   animação: os dois keyframes de cada slot são iguais, e o NX2 só chama DrawScene.
  * Recortes: os "T tex x y w h u1 v1 u2 v2" dos .spr do CREDIT.DAT.
  */
 #include "pumpy.h"
@@ -38,13 +37,15 @@ static bool     s_failed;
 typedef struct { int x, y, w, h, u1, v1, u2, v2; } CrTile;
 
 /* credit01.spr e credit02.spr: 3 tiles cada (desenhados do último para o primeiro) */
-static const CrTile k_cred01[3] = { { 25, 5, 76, 11, 1, 26, 77, 37 }, { 122, 5, 43, 11, 96, 26, 139, 37 }, { 0, 0, 193, 24, 0, 0, 193, 24 } };
-static const CrTile k_cred02[3] = { { 20, 5, 76, 11, 1, 26, 77, 37 }, { 130, 5, 43, 11, 96, 26, 139, 37 }, { 0, 0, 193, 24, 0, 0, 193, 24 } };
-/* cr0..cr9.spr: 12x10, v 41..51 */
-static const int k_digU[10] = { 3, 18, 33, 48, 63, 79, 94, 109, 124, 139 };
-static const CrTile k_free = { 0, 0, 96, 13, 0, 0, 96, 13 };      /* freeplay.spr */
-static const CrTile k_event = { 0, 0, 84, 21, 3, 48, 87, 69 };    /* event.spr    */
-static const CrTile k_demo = { 0, 0, 220, 32, 1, 14, 221, 46 };   /* demoplay.spr */
+/* NX2: credit01.spr / credit02.spr têm 5 tiles ("CREDIT[S]", "(", "/", ")" e a barra), extensão 150x20 */
+static const CrTile k_cred01[5] = { { 5, 0, 80, 20, 1, 1, 81, 21 }, { 87, 0, 20, 20, 82, 1, 102, 21 }, { 106, 0, 20, 20, 103, 1, 123, 21 },
+                                    { 125, 0, 20, 20, 124, 1, 144, 21 }, { 0, 0, 150, 20, 1, 43, 151, 63 } };
+static const CrTile k_cred02[5] = { { 0, 0, 80, 20, 1, 1, 81, 21 }, { 90, 0, 20, 20, 82, 1, 102, 21 }, { 109, 0, 20, 20, 103, 1, 123, 21 },
+                                    { 130, 0, 20, 20, 124, 1, 144, 21 }, { 0, 0, 150, 20, 1, 43, 151, 63 } };
+/* cr0..cr9.spr: 20x20 em credit01.tga, 5 por linha, passo 21, a partir de (151,1) */
+static const CrTile k_free = { 0, 0, 120, 26, 1, 1, 121, 27 };    /* freeplay.spr (CTEXTS.tga) */
+static const CrTile k_event = { 0, 0, 120, 26, 1, 73, 121, 99 };  /* event.spr    */
+static const CrTile k_demo = { 0, 0, 240, 44, 1, 28, 241, 72 };   /* demoplay.spr */
 
 static bool crLoad(void) {
     if (s_gen == g_texGeneration && !s_failed) return s_texText >= 0 && s_texCred >= 0;
@@ -73,8 +74,9 @@ static void crTile(int tex, const CrTile* t, float cx, float cy, float extW, flo
 static void crDigit(int d, float cx, float cy) {
     if (d < 0) d = 0;
     if (d > 9) d = 9;
-    CrTile t = { 0, 0, 12, 10, k_digU[d], 41, k_digU[d] + 12, 51 };
-    crTile(s_texCred, &t, cx, cy, 12.0f, 10.0f, 1.0f, 1.0f);
+    int u = 151 + 21 * (d % 5), v = 1 + 21 * (d / 5);
+    CrTile t = { 0, 0, 20, 20, u, v, u + 20, v + 20 };
+    crTile(s_texCred, &t, cx, cy, 20.0f, 20.0f, 1.0f, 1.0f);
 }
 
 void NxCredit_Draw(void) {
@@ -95,29 +97,29 @@ void NxCredit_Draw(void) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     if (g_demoPlay && g_game.state == STATE_GAMEPLAY) {   /* DrawDemoPlay */
-        crTile(s_texText, &k_demo, 128.0f, 440.0f, 220.0f, 32.0f, 0.8f, 0.0f);
-        crTile(s_texText, &k_demo, 512.0f, 440.0f, 220.0f, 32.0f, 0.8f, 0.0f);
+        crTile(s_texText, &k_demo, 128.0f, 460.0f, 240.0f, 44.0f, 0.8f, 0.75f);
+        crTile(s_texText, &k_demo, 512.0f, 460.0f, 240.0f, 44.0f, 0.8f, 0.75f);
     }
 
     if (g_game.svcGameMode == 1) {                      /* EVENT */
-        crTile(s_texText, &k_event, 320.0f, 467.0f, 84.0f, 21.0f, 1.0f, 0.5f);
+        crTile(s_texText, &k_event, 320.0f, 460.0f, 120.0f, 26.0f, 1.0f, 1.0f);
     } else if (g_game.svcCoin1 == 0) {                  /* FREE PLAY */
-        crTile(s_texText, &k_free, 322.0f, 469.0f, 96.0f, 13.0f, 1.0f, 0.5f);
+        crTile(s_texText, &k_free, 322.0f, 463.0f, 120.0f, 26.0f, 1.0f, 1.0f);
     } else {
         int credit = g_game.svcCoinTotal / g_game.svcCoin1;
         int tail = g_game.svcCoinTotal % g_game.svcCoin1;
         if (credit > 99) credit = 99;
         const CrTile* base = (credit < 10) ? k_cred01 : k_cred02;
-        for (int t = 2; t >= 0; t--) crTile(s_texCred, &base[t], 322.0f, 470.0f, 193.0f, 24.0f, 1.0f, 1.0f);
+        for (int t = 4; t >= 0; t--) crTile(s_texCred, &base[t], 322.0f, 463.0f, 150.0f, 20.0f, 1.0f, 1.0f);
         if (credit < 10) {                              /* "creidit _0" */
-            crDigit(credit, 339.0f, 468.0f);
-            crDigit(tail, 359.0f, 468.0f);
-            crDigit(g_game.svcCoin1, 378.0f, 468.0f);
+            crDigit(credit, 334.0f, 463.0f);
+            crDigit(tail, 354.0f, 463.0f);
+            crDigit(g_game.svcCoin1, 374.0f, 463.0f);
         } else {                                        /* "creidit _00" */
-            crDigit(credit / 10, 333.0f, 468.0f);
-            crDigit(credit % 10, 345.0f, 468.0f);
-            crDigit(tail, 367.0f, 468.0f);
-            crDigit(g_game.svcCoin1, 387.0f, 468.0f);
+            crDigit(credit / 10, 327.0f, 463.0f);
+            crDigit(credit % 10, 337.0f, 463.0f);
+            crDigit(tail, 357.0f, 463.0f);
+            crDigit(g_game.svcCoin1, 378.0f, 463.0f);
         }
     }
 
