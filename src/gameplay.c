@@ -1476,6 +1476,7 @@ static bool loadChartForSong(int songId, int diffTier, const char* modeName)
             g_game.cmdDecel[0]          = g_game.cmdDecel[1];
             g_game.cmdFlash[0]          = g_game.cmdFlash[1];
             g_game.cmdGradeRev[0]       = g_game.cmdGradeRev[1];
+            g_game.cmdHard[0]           = g_game.cmdHard[1];
             g_game.cmdNXMode[0]         = g_game.cmdNXMode[1];
             g_game.cmdUnderAttack[0]    = g_game.cmdUnderAttack[1];
         }
@@ -1500,7 +1501,6 @@ static bool loadChartForSong(int songId, int diffTier, const char* modeName)
 
     g_baseBeatSplit = g_chart->segments[0].beatSplit;
     g_baseBpm = g_chart->segments[0].bpm;
-            g_game.cmdHard[0]           = g_game.cmdHard[1];
 
     // Pre-compute normalized visual rows (BPM-based, ignoring beatSplit)
     g_visualRowCount = (int)g_chart->rowCount;
@@ -2028,6 +2028,7 @@ static void noteExplode(int p, int pan, int ri)
 /* resultado da linha: média dos taps (NX); sem tap (só long) fica o PERFECT do long */
 static JudgeType rowResult(int p, int ri)
 {
+    g_jp = p;
     if (!g_zCnt[p] || !g_zCnt[p][ri]) return (JudgeType)g_zRowJ[p][ri];
     if (!g_hexSongIds) return (JudgeType)g_zRowJ[p][ri];   /* outras versões: pior resultado */
     int lvl = judgeLvl();
@@ -2041,6 +2042,7 @@ static JudgeType rowResult(int p, int ri)
 
 static void judgeRows(int p)
 {
+    g_jp = p;
     if (!g_songLoaded || !g_chart || !g_zHit[p]) return;
     bool dn = isDNMode();
     int panCount = dn ? 10 : 5;
@@ -2052,7 +2054,6 @@ static void judgeRows(int p)
     /* botões: flash do receptor e efeito de pisar (0x807ff20), com ou sem nota */
     bool hitB[10], downB[10];
     for (int pan = 0; pan < panCount; pan++) {
-    g_jp = p;
         int pl = dn ? dnPanelPlayer(pan) : p;
         PadButton b = dn ? (PadButton)dnPanelBtn(pan) : k_btn[pan];
         hitB[pan] = Input_IsPadHit(pl, b);
@@ -2066,7 +2067,6 @@ static void judgeRows(int p)
     /* 1) acertos: a primeira linha com nota pisada encerra a busca do quadro */
     for (int ri = g_zFirst[p]; ri < g_zRows; ri++) {
         double diff = g_songTime - getRowTime(ri);
-    g_jp = p;
         if (diff < -badE) break;
         if (g_zDone[p][ri]) continue;
         bool any = false, hitNow = false;
@@ -2207,6 +2207,7 @@ static void judgeRows(int p)
 
 static void processInput(int player)
 {
+    g_jp = player;
     if (!g_songLoaded) return;
 
     bool isHD = isHDMode();
@@ -2231,7 +2232,6 @@ static void processInput(int player)
             panel = getPanelForButton((PadButton)b);
             btn = (PadButton)b;
             usePlayer = player;
-    g_jp = player;
         }
         if (panel < 0) continue;
         if (!Input_IsPadHit(usePlayer, btn)) continue;
