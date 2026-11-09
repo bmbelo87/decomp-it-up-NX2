@@ -366,8 +366,13 @@ void Nx2Select_Enter(void)
         BGA_SceneFinish(UB, "arcade_channel_change_b");
         BGA_SceneFinish(UB, "special_channel_change_b");
         s_joinAnim = false;                                        /* cena de entrada tardia do USB_COMMON.DAT */
+        /* era (hipótese): cena USB_INTO_OTHER_PLAYER do USB_INTO_OTHER_PLAYER.DAT. Confirmado pelo usuário: a entrada tardia
+         * usa os sprites do USB_COMMON.DAT (cena USB_OTHER_PLAYER_IN).
         for (int i = 0; i < BGA_SceneCount(UINTO); i++) { const char* nm = BGA_SceneNameAt(UINTO, i); if (nm && !strcmp(nm, "USB_INTO_OTHER_PLAYER")) s_joinAnim = true; }
-        if (!s_joinAnim) Log_Print("NX2SELECT: cena USB_INTO_OTHER_PLAYER não existe no USB_INTO_OTHER_PLAYER.DAT\n");
+
+        if (!s_joinAnim) Log_Print("NX2SELECT: cena USB_INTO_OTHER_PLAYER não existe no USB_INTO_OTHER_PLAYER.DAT\n"); */
+        for (int i = 0; i < BGA_SceneCount(UCOM); i++) { const char* nm = BGA_SceneNameAt(UCOM, i); if (nm && !strcmp(nm, "USB_OTHER_PLAYER_IN")) s_joinAnim = true; }
+        if (!s_joinAnim) Log_Print("NX2SELECT: cena USB_OTHER_PLAYER_IN não existe no USB_COMMON.DAT\n");
     }
     s_joining = false;
 
@@ -994,7 +999,7 @@ void Nx2Select_Update(float dt)
     Movie_Update(dt);
     if (!s_ok) return;
     if (s_joining) {                                      /* m_bJoin (select.cpp:1450): o resto da Select fica parado */
-        if (BGA_SceneDone(UINTO, "USB_INTO_OTHER_PLAYER")) { s_joining = false; Game_ChangeState(STATE_NX_USBIN); }
+        if (BGA_SceneDone(UCOM, "USB_OTHER_PLAYER_IN")) { s_joining = false; Game_ChangeState(STATE_NX_USBIN); }
         return;
     }
     if (s_phase == 0) {                                   /* Start */
@@ -1035,7 +1040,7 @@ void Nx2Select_Update(float dt)
         s_joinReturn = true; s_joinId = (int)g_songTable[s_list[s_cur]].id; Title_PlayMusic();
         if (s_joinAnim) {                                  /* m_bJoin: SetJoin(true) toca USB_OTHER_PLAYER_IN; ao fechar, Next(true) */
             s_joining = true;
-            BGA_SceneReset(UINTO, "USB_INTO_OTHER_PLAYER");
+            BGA_SceneReset(UCOM, "USB_OTHER_PLAYER_IN");   /* era: UINTO, "USB_INTO_OTHER_PLAYER" */
             return;
         }
         Game_ChangeState(STATE_NX_USBIN);
@@ -1120,5 +1125,5 @@ void Nx2Select_Render(void)
     if (twoPlayers()) BGA_ScenePlay(UC, "degree of difficulty_dual_2p_in", true);
     BGA_ScenePlay(UB, s_special ? "special_channel_change_b" : "arcade_channel_change_b", true);
     for (int p = 0; p < 2; p++) if (s_active & (1u << p)) iconDraw(p);   /* Select_DrawIcon */
-    if (s_joining) BGA_ScenePlay(UINTO, "USB_INTO_OTHER_PLAYER", true);       /* CUsbstate::Draw: m_iJoinStep == E_JOIN_IN */
+    if (s_joining) BGA_ScenePlay(UCOM, "USB_OTHER_PLAYER_IN", true);   /* era: UINTO, "USB_INTO_OTHER_PLAYER" */       /* CUsbstate::Draw: m_iJoinStep == E_JOIN_IN */
 }
