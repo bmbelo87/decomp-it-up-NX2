@@ -244,14 +244,16 @@ static const SelCode k_codes[18] = {
 /* era: static int s_skin = 8; (uma skin para os dois)
  * NX2 CPlayer::m_CurrentSkin: skin por jogador. NX: padrão SKIN08 (informado
  * pelo usuário); SKIN09..12 só existem na NX2, então o limite fica em 8. */
-static int s_skin[2] = { 8, 8 };
+static int s_skin[2] = { 0, 0 };   /* era { 8, 8 }; o padrão é a SKIN00 (Skin_Default) */
 int Skin_Index(void) { return s_skin[0]; }
 int Skin_IndexP(int p) { return s_skin[(p == 1) ? 1 : 0]; }
 void Skin_SetIndex(int n) { if (n >= 0 && n <= 18) s_skin[0] = s_skin[1] = n; }   /* console /skin */
 void Skin_SetIndexP(int p, int n) { if (n >= 0 && n <= 18) s_skin[(p == 1) ? 1 : 0] = n; }
 /* Skin padrão (pedido do usuário): VANILLA = SKIN00, como o piu (o código de limpar volta o
  * NOTESKIN para "0", 0x807c08a); MODDED = SKIN08, a padrão que o projeto usava sempre. */
-int Skin_Default(void) { return g_game.gameStyleModded ? 8 : 0; }
+/* Pedido do usuário (NX2): mesmo no MODDED a skin padrão é a SKIN00 nesta versão.
+ * era: int Skin_Default(void) { return g_game.gameStyleModded ? 8 : 0; } */
+int Skin_Default(void) { return 0; }
 
 static bool twoPlayers(void) { return (s_joined & 3) == 3; }
 
