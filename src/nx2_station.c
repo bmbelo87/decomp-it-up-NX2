@@ -22,6 +22,7 @@
 #include "pumpy.h"
 #include "bga.h"
 #include "movie.h"
+#include "nx2_mission.h"
 
 extern unsigned Title_GetJoinedMask(void);
 
@@ -95,6 +96,7 @@ static void reorganize(int mode)
 
 void Nx2Station_Enter(void)
 {
+    NxMission_Load();   /* WORLD MAX: mission.txt (CMissionManager); por enquanto só o log de contagem */
     s_active = Title_GetJoinedMask() & 3;
     if (!s_active) s_active = 1;
     Title_StopMusic();
