@@ -242,9 +242,11 @@ target_include_directories(Pumpy PRIVATE include)
 # era: RECOMP_PATCH_BASE -1, base fcfa521. Depois da v0.4.4 (17be57d) entraram commits de fora
 # da série (.recomp.json, PR #6); a 0.4.5 é o 2º commit depois de e41ee29 (o 1º, b9b1754,
 # não compilava no Win32).
-set(RECOMP_MAJOR_MINOR "0.4")
-set(RECOMP_PATCH_BASE 3)    # o 2º commit depois da base é o .5
-set(RECOMP_BASE_COMMIT "e41ee29")
+# era: série 0.4.x (projeto anterior): RECOMP_MAJOR_MINOR "0.4", RECOMP_PATCH_BASE 3, RECOMP_BASE_COMMIT "e41ee29".
+# Série 0.5.x = NX2: base 62a0d9a (último commit antes do versionamento); o commit desta troca é a 0.5.0.
+set(RECOMP_MAJOR_MINOR "0.5")
+set(RECOMP_PATCH_BASE -1)
+set(RECOMP_BASE_COMMIT "62a0d9a")
 set(RECOMP_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 add_custom_target(recomp_version ALL
     COMMAND ${CMAKE_COMMAND}
