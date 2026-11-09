@@ -61,6 +61,7 @@ static void nxFillRow(StepRow* r, const uint16_t* c, int cols)
     uint8_t v[10] = { 0 };
     if (cols == 6) { for (int i = 0; i < 6; i++) v[2 + i] = nxCell(c[i]); }
     else            { for (int i = 0; i < cols && i < 10; i++) v[i] = nxCell(c[i]); }
+    for (int i = 0; i < cols && i < 10; i++) if (nxCell(c[i])) { r->idBank = (uint8_t)(c[i] >> 8); break; }   /* Id_Bank: byte alto da celula */
     r->half1.dl = v[0]; r->half1.ul = v[1]; r->half1.cn = v[2]; r->half1.ur = v[3]; r->half1.dr = v[4];
     if (cols == 5) r->half2 = r->half1;   /* single: P2 le a mesma metade (como no .SEE) */
     else { r->half2.dl = v[5]; r->half2.ul = v[6]; r->half2.cn = v[7]; r->half2.ur = v[8]; r->half2.dr = v[9]; }

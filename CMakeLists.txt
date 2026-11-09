@@ -223,6 +223,8 @@ add_executable(Pumpy
     src/nx2_usbstate.c
     src/nx2_usbout.c
     src/nx2_mission.c
+    src/nx2_world.c
+    src/nx2_wgrade.c
     src/nx2_sports.c
     src/song.c
     src/zlibinflate.c

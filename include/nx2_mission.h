@@ -55,6 +55,7 @@ NxMission*  NxMission_ById(const short id[3]);
 NxMission*  NxMission_ByStep(const char* step);      /* stricmp */
 int         NxMission_Nx2Count(void);                /* m_vNX2MissionList: 15 pontos da NX2 ZONE (createNx2Mission) */
 NxMission*  NxMission_Nx2At(int i);
+int         NxMission_SongIdForStepId(int stepId);   /* 0xEFnnn -> id hex do SONG da missão (ex.: B19 -> 0xB19); -1 sem */
 
 /* lista corrente (m_vCurMissionList): cópias dos missões com id[1] == 0 */
 void        NxMission_SetDefaultList(void);          /* setDefaultMissionList */

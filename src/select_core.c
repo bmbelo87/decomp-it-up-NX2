@@ -28,6 +28,7 @@
  * (SELECT2), painel de dificuldade, sons, confirmação da música.
  */
 #include "pumpy.h"
+#include "nx2_mission.h"
 #include "bga.h"
 
 #define SEL_BGA   0   /* [this+4] */
@@ -105,6 +106,11 @@ int Song_DataId(int id) {
 int NX_ResId(int id) {
     for (int i = 0; i < NX_RESMAP_COUNT; i++)
         if ((int)g_nxResMap[i][1] == id) return (int)g_nxResMap[i][0];
+    /* NX2 WORLD MAX: o chart da missão (EFnnn / 0xEFnnn) usa a música do campo SONG do mission.txt (ex.: EF001 -> B19) */
+    if ((id & 0xFF000) == 0xEF000) {
+        int r = NxMission_SongIdForStepId(id);
+        if (r >= 0) return r;
+    }
     /* era: return -1 direto. Os extras do port (índices >= NX_SONG_BASE) não estão
      * em 0x813f860; o recurso deles é o baseId da própria entrada (D208 -> 208).
      * Sem isso TITLE, disco (TEST.DAT) e PREVIEW da D208 não achavam a 208. */

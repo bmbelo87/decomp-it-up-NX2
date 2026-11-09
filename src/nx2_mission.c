@@ -355,3 +355,16 @@ void NxMission_ChangeData(int another)
         }
     }
 }
+
+/* WORLD MAX: o chart EFnnn não tem áudio/capa próprios; usa a música do campo SONG (hex) da missão */
+int NxMission_SongIdForStepId(int stepId)
+{
+    char step[16];
+    snprintf(step, sizeof(step), "%X", (unsigned)stepId);
+    NxMission_Load();
+    NxMission* m = NxMission_ByStep(step);
+    if (!m || !m->song[0]) return -1;
+    char* end = NULL;
+    long v = strtol(m->song, &end, 16);
+    return (end && end != m->song) ? (int)v : -1;
+}

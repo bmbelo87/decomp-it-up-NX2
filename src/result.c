@@ -830,14 +830,15 @@ void Result_Enter(void) {
             if (p == 0) g_gradeP1 = resGradeOf(r, g_game.stats.missCount[0]);
             else        g_gradeP2 = resGradeOf(r, g_game.stats.missCount[1]);
         }
-        { float rr[2] = { g_stageRatio[0][st], g_stageRatio[1][st] }; int gg[2] = { g_gradeP1, g_gradeP2 }; Nx2Sess_StageDone(st, rr, gg); }   /* dancegrade.cpp:374/417: kcal, VO2, mileage e m_Info[] da sessão */
+        /* WORLD MAX: a missão não passa pelo CDanceGrade; o mileage vem do CWorldGrade (nx2_wgrade.c) */
+        if (g_game.nxGameMode != 2) { float rr[2] = { g_stageRatio[0][st], g_stageRatio[1][st] }; int gg[2] = { g_gradeP1, g_gradeP2 }; Nx2Sess_StageDone(st, rr, gg); }   /* dancegrade.cpp:374/417: kcal, VO2, mileage e m_Info[] da sessão */
     }
     s_cheatStage = g_gradeCheat;
     g_gradeCheat = false;
     Log_Print("Result: grades P1=%d P2=%d\n", g_gradeP1, g_gradeP2);
     g_wgActive = g_hexSongIds && g_game.nxGameMode == 2;
     g_wgFadeEnd = 580;
-    if (g_wgActive) wgEnter();                    /* NX WORLD TOUR: CWorldGrade */
+    if (g_wgActive) Nx2WG_Enter(wgPlayer(), wgPlayer() ? g_gradeP2 : g_gradeP1);   /* NX2 WORLD MAX: CWorldGrade (era: wgEnter, do NX) */
     else if (g_hexSongIds) zDanceGradeEnter();
 }
 
@@ -852,9 +853,9 @@ void Result_Update(float dt) {
         }
         if (g_game.state != STATE_DANCE_GRADE_DISPLAY) return;
         /* resGradeSounds(g_resT);  Exceed */
-        if (g_wgActive ? wgUpdate(&g_resT, dt) : zDanceGradeUpdate(&g_resT, dt)) {      /* Zero 0x806f770; Exceed: g_resT > 0x168 */
+        if (g_wgActive ? Nx2WG_Update(dt) : zDanceGradeUpdate(&g_resT, dt)) {   /* era: wgUpdate(&g_resT, dt) */      /* Zero 0x806f770; Exceed: g_resT > 0x168 */
             Movie_Close();
-            GameState ns = g_wgActive ? wgNext() : Result_GetNextState();
+            GameState ns = g_wgActive ? Nx2WG_Next() : Result_GetNextState();   /* era: wgNext() */
             BGM_Stop();
             zStopAll();
             Resource_ClearBGA();
@@ -918,7 +919,7 @@ void Result_Render(void) {
             return;
         }
         if (g_game.state != STATE_DANCE_GRADE_DISPLAY) return;
-        if (g_wgActive) wgRender(g_resT);        /* NX WORLD TOUR */
+        if (g_wgActive) Nx2WG_Render();          /* NX2 WORLD MAX (era: wgRender(g_resT), do NX) */
         else zDanceGradeRender(g_resT);          /* Zero */
         /* Exceed:
         BGA_SetEventFrame(0, g_resT % 360 + 60);

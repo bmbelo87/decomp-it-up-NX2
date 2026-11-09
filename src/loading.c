@@ -210,7 +210,9 @@ void Loading_Update(float dt) {
 
         if (g_loadingTimer <= 0) {
             /* NX WORLD TOUR (0x806bee0): objetivo da missão antes da música */
-            if (g_hexSongIds && (g_game.nxGameMode == 2 || g_game.nxGameMode == 3)) { g_pnzTexId = -1; NxMission_Enter(g_loadingSongId); return; }
+            /* NX2 WORLD MAX (nxGameMode 2): o objetivo já foi mostrado no W_BRIEFING, antes do título; entra direto na música */
+            if (g_hexSongIds && g_game.nxGameMode == 3) { g_pnzTexId = -1; NxMission_Enter(g_loadingSongId); return; }
+            /* era: (g_game.nxGameMode == 2 || g_game.nxGameMode == 3) */
             Loading_BeginGameplay();
         }
         return;

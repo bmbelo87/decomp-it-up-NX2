@@ -60,6 +60,7 @@ typedef struct {
 typedef struct {
     StepHalf half1;
     StepHalf half2;
+    uint8_t  idBank;   /* .NX: Id_Bank das notas da linha (banco de julgamento = & 3, skin = >> 2). As linhas do .NX nao misturam bancos (conferido nos EF*.NX) */
 } StepRow;
 
 typedef struct {

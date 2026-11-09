@@ -278,6 +278,8 @@ static void applyLife(int player, JudgeType jt)
         if (lv < 0) lv = 0;
         if (lv > 30) lv = 30;
         int limit = 1000 + 3 * lv * lv;
+        /* NX2 WORLD MAX (playengine.cpp:1230..1255): # troca o limite; a vida comprada soma ao limite */
+        if (g_game.nxGameMode == 2) { if (g_nx2WGLimit) limit = g_nx2WGLimit; limit += g_nx2WGBonus; }
         if (*life > limit) *life = limit;
     }
     /* Exceed (0x409BC2..0x40A0CD): a vida em [+0x168] nunca é limitada —
@@ -1938,8 +1940,27 @@ static double holdLeadSec(bool earlyFamily)
 /* Aplica o julgamento de UMA linha de hold (cabeça/corpo/cauda). No original cada linha é um
  * julgamento completo: score, combo, contadores e life/speed (0x41021a..0x410326). O código de hold
  * do port só mexia em combo/score e nunca no life. */
+/* NX2 m_Stat[bank]: o chart .NX marca cada nota com um banco (Id_Bank & 3); a linha toda é de um banco só */
+int g_nxBankJudge[2][3][5], g_nxBankTotal[2][3], g_nxBankMaxCombo[2][3], g_nxBankMaxMissCombo[2][3];
+static int g_nxBankCombo[2][3], g_nxBankMissCombo[2][3];
+static int s_rowBank;
+static void bankCount(int p, JudgeType jt)
+{
+    int b = s_rowBank & 3;
+    if (b > 2 || jt < JT_PERFECT || jt > JT_MISS) return;
+    g_nxBankJudge[p][b][jt - JT_PERFECT]++;
+    g_nxBankTotal[p][b]++;
+    if (jt == JT_PERFECT || jt == JT_GREAT) { g_nxBankCombo[p][b]++; g_nxBankMissCombo[p][b] = 0; }
+    else if (jt == JT_GOOD) g_nxBankMissCombo[p][b] = 0;
+    else if (jt == JT_BAD) { g_nxBankCombo[p][b] = 0; g_nxBankMissCombo[p][b] = 0; }
+    else { g_nxBankCombo[p][b] = 0; g_nxBankMissCombo[p][b]++; }
+    if (g_nxBankCombo[p][b] > g_nxBankMaxCombo[p][b]) g_nxBankMaxCombo[p][b] = g_nxBankCombo[p][b];
+    if (g_nxBankMissCombo[p][b] > g_nxBankMaxMissCombo[p][b]) g_nxBankMaxMissCombo[p][b] = g_nxBankMissCombo[p][b];
+}
+
 static void applyRowJudgment(int p, JudgeType jt)
 {
+    bankCount(p, jt);
     switch (jt) {
     case JT_PERFECT:
         g_game.stats.combo[p]++;
@@ -2164,6 +2185,7 @@ static void judgeRows(int p)
                             g_lastPerfectRow[p][pan] = ri;
                         }
                 }
+                s_rowBank = g_chart->rows[ri].idBank;
                 applyRowJudgment(p, jt);
                 if (g_misHiddenRow(p, ri) && jt != JT_MISS) g_nxMis[p].hidden++;   /* 0x806fb8e */
             }
@@ -2194,6 +2216,7 @@ static void judgeRows(int p)
         /* era: if (missed) applyRowJudgment(p, JT_MISS);
          * piu 0x806fd2b: resultado 5 (MISS) com máscara & 0x20 (linha só de hidden) sai sem
          * [+0x10]++ (totalstep) e sem 0x80706f0 — não conta MISS nem quebra combo */
+        s_rowBank = g_chart->rows[ri].idBank;
         if (missed) { if (!g_misHiddenRow(p, ri)) applyRowJudgment(p, JT_MISS); }
         else if (g_zRowJ[p][ri]) {
             applyRowJudgment(p, rowResult(p, ri));   /* era: (JudgeType)g_zRowJ[p][ri] */
@@ -2938,6 +2961,9 @@ void Gameplay_Start(int songId)
         if (g_game.input.autoplay) autoplayLog("g_game.input.autoplay", true);
     }
     memset(&g_game.stats, 0, sizeof(g_game.stats));
+    memset(g_nxBankJudge, 0, sizeof(g_nxBankJudge)); memset(g_nxBankTotal, 0, sizeof(g_nxBankTotal));
+    memset(g_nxBankMaxCombo, 0, sizeof(g_nxBankMaxCombo)); memset(g_nxBankMaxMissCombo, 0, sizeof(g_nxBankMaxMissCombo));
+    memset(g_nxBankCombo, 0, sizeof(g_nxBankCombo)); memset(g_nxBankMissCombo, 0, sizeof(g_nxBankMissCombo));
     memset(s_scorePrev, 0, sizeof(s_scorePrev));
     g_game.stats.life[0]      = LIFE_INITIAL; /* source oficial: m_Gauge = 500 (era 224, ajuste visual) */
     g_game.stats.life[1]      = LIFE_INITIAL;
@@ -2946,6 +2972,14 @@ void Gameplay_Start(int songId)
          * cada jogador ativo — o mesmo m_Gauge = 500 do playengine.cpp. */
         g_game.stats.life[0] = LIFE_INITIAL;
         g_game.stats.life[1] = LIFE_INITIAL;
+    }
+    if (g_game.nxGameMode == 2 && g_hexSongIds) {   /* NX2 WORLD MAX (depois do 500 fixo acima, que o sobrescrevia): @ = vida inicial, mais a vida comprada no briefing */
+        /* Pedido do usuário: o total com a vida comprada vira 100% e a barra começa visualmente como a original (50%);
+         * a diferença é que perde menos e demora mais para encher. era (nx2src): (@ ou 500) + bônus, que começava ~92% no Lv.4 */
+        int disp0 = g_nx2WGDisp ? g_nx2WGDisp : 1000;
+        int st0 = g_nx2WGStart ? g_nx2WGStart : LIFE_INITIAL;
+        g_game.stats.life[0] = g_game.stats.life[1] = (int)((long long)st0 * (disp0 + g_nx2WGBonus) / disp0);
+        /* era: g_game.stats.life[0] = g_game.stats.life[1] = (g_nx2WGStart ? g_nx2WGStart : LIFE_INITIAL) + g_nx2WGBonus; */
     }
     /* lifeSpeed inicial varia por nível (GameInit 0x00411381):
      * easy=500, normal=300, hard=100. Antes era fixo em 500, o perfil do easy. */
@@ -3507,7 +3541,8 @@ void Gameplay_Update(float dt)
         int stageIdx = g_game.isBonusSong ? 3 : 2 - g_game.stageCount;
         if (stageIdx < 0) stageIdx = 0;
         bool nxWorld = g_game.nxGameMode == 2;
-        bool lifeFailActive = nxWorld || ((opt != 0) && (stageIdx + 1 >= opt));
+        /* NX2 WORLD MAX (playengine.cpp:2286): só quebra por vida zerada e só se a missão tem Break ON; nunca por 51 misses */
+        bool lifeFailActive = nxWorld ? g_nx2WorldBreak : ((opt != 0) && (stageIdx + 1 >= opt));
         bool missFailActive = !nxWorld;
         if (g_game.nxGameMode == 3 || g_game.svcGameMode == 1) lifeFailActive = missFailActive = false;
 
@@ -3879,8 +3914,11 @@ static void nxLifebarDraw(int p, float t, bool otherActive)
     if (!otherActive) lifeTile(g + 1, 1, 1, 1, 1);
 
     /* largura da barra */
-    float v = (float)life / 1000.0f;
-    if (life <= 999) {
+    /* NX2 WORLD MAX: % = fundo de escala da barra (m_iDispMax), mais a vida comprada */
+    float dispMax = 1000.0f;
+    if (g_game.nxGameMode == 2) { if (g_nx2WGDisp) dispMax = (float)g_nx2WGDisp; dispMax += (float)g_nx2WGBonus; }
+    float v = (float)life / dispMax;
+    if (life < (int)dispMax) {
         int k = (int)((1.0f - t) * 59.0f) / 10;
         if (k < 0) k = 0;
         if (k > 5) k = 5;
@@ -3891,7 +3929,7 @@ static void nxLifebarDraw(int p, float t, bool otherActive)
     if (n >= 0x3e) n = 0x3d;
     int len = n * 4;
     if (life != 0) len++;
-    if (life >= 1000) len++;
+    if (life >= (int)dispMax) len++;
 
     SPRTileDef* bar = &g_game.sprTiles[g + 2];
     if (bar->texId >= 0 && bar->texId < MAX_TEXTURES && g_game.textures[bar->texId].inUse) {
@@ -3910,15 +3948,16 @@ static void nxLifebarDraw(int p, float t, bool otherActive)
         glEnd();
     }
 
-    if (life > 999) {
+    /* barra cheia e perigo valem em relação ao fundo de escala (gauge.cpp:160/167: >= DispMax e < DispMax / 3) */
+    if (life >= (int)dispMax) {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE);
         lifeTile(g + 3, 1, 1, 1, s_nxGaugeBlink[p] ? 0.5f : 0.0f);
-    } else if (life <= 0x14d) {
+    } else if (life <= (int)(dispMax / 3.0f)) {
         lifeTile(g + 4, 1, 1, 1, s_nxGaugeBlink[p] ? 0.75f : 0.25f);
     }
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    int n2 = life * 61 / 1000;
+    int n2 = (int)((long long)life * 61 / (long long)dispMax);   /* o ponteiro acompanha a escala (gauge.cpp:175: Gauge * nGaugeBlock / m_iDispMax) */
     if (n2 < 0) n2 = 0;
     if (n2 >= 0x3e) n2 = 0x3d;
     if (s_nxGaugeBlink[p]) {

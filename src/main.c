@@ -92,7 +92,7 @@ static void LoadBGAForState(GameState state) {
     case STATE_STAGE_BREAK:           /* Prex3: 083.DAT + 7-1.WAV; Exceed: BGA\SB.MOV (sem .DAT) */
         bgaName = g_hexSongIds ? "" : "083"; break;
     case STATE_DANCE_GRADE_ENTER:
-    case STATE_DANCE_GRADE_DISPLAY: bgaName = g_hexSongIds ? (g_game.nxGameMode == 2 ? "WORLDGRADE" : "DANCE_GRADE") : "83"; break;   /* era: "GRADE" (NX); NX2: CDanceGrade::Begin "BGA/DANCE_GRADE.DAT" */ /* Exceed 0x40CD2A: BGA\GRADE.DAT; NX WORLD TOUR 0x808e6c6: BGA/WORLDGRADE.DAT */
+    case STATE_DANCE_GRADE_DISPLAY: bgaName = g_hexSongIds ? (g_game.nxGameMode == 2 ? "WORLD_MAX_GRADE" : "DANCE_GRADE") : "83"; break;   /* era: "GRADE" (NX); NX2: CDanceGrade::Begin "BGA/DANCE_GRADE.DAT" */ /* Exceed 0x40CD2A: BGA\GRADE.DAT; NX WORLD TOUR 0x808e6c6: BGA/WORLDGRADE.DAT */
     case STATE_HOWTOPLAY: bgaName = ""; break; /* limpa BGA do menu imediatamente; 03.DAT carrega no stateFrame==1 */
     case STATE_SERVICE_MENU: bgaName = ""; break; /* SETUP MENU desenha sobre fundo preto */
     default: break;
@@ -120,6 +120,7 @@ static void LoadBGAForState(GameState state) {
         /* ClassicSelect_Enter(); */    /* Zero: CSelect (select_classic.c) */
         /* NX2: Arcade/Special = CSelect do NX2 (nx2_select.c); WorldMax/Training ainda na da NX (nx_select.c) */
         if (g_game.nxGameMode == 0 || g_game.nxGameMode == 1) Nx2Select_Enter();
+        else if (g_game.nxGameMode == 2) Nx2World_Enter();   /* WORLD MAX do NX2 (nx2_world.c) */
         else NxSelect_Enter();       /* NX: CSelect (nx_select.c) */
         /* Select_Enter(); */      /* Exceed2 */
     }
@@ -360,6 +361,8 @@ void Game_Init(HINSTANCE hInstance) {
         const char* as = getenv("PUMPY_AUTOSTATE");
         if (as && _stricmp(as, "SELECT") == 0) { Menu_ResetState(); Game_ChangeState(STATE_SELECT); }
         if (as && _stricmp(as, "STATION") == 0) Game_ChangeState(STATE_STATION);
+        /* NX2 (teste): PUMPY_AUTOSTATE=WORLD abre direto o mapa do WORLD MAX com o jogador 1 */
+        if (as && _stricmp(as, "WORLD") == 0) { Title_SetJoinedMask(1); Menu_ResetState(); g_game.nxGameMode = 2; if (getenv("NX2WORLD_PROFILE")) Nx2Profile_Load(0); Game_ChangeState(STATE_SELECT); }
         if (as && _stricmp(as, "GRADE") == 0) { Menu_ResetState(); Game_ChangeState(STATE_DANCE_GRADE_ENTER); }   /* teste: abre o Dance Grade */
         /* NX2 (teste): PUMPY_AUTOSTATE=USBIN abre direto a entrada do perfil com os dois jogadores */
         if (as && _stricmp(as, "USBIN") == 0) { Title_SetJoinedMask(3); Game_ChangeState(STATE_NX_USBIN); }
@@ -609,6 +612,7 @@ void Game_Update(float dt) {
     case STATE_SELECT:
         /* ClassicSelect_Update(dt); */
         if (g_game.nxGameMode == 0 || g_game.nxGameMode == 1) Nx2Select_Update(dt);
+        else if (g_game.nxGameMode == 2) Nx2World_Update(dt);
         else NxSelect_Update(dt);
         /* Select_Update(dt); */
         break;
@@ -720,11 +724,13 @@ void Game_Update(float dt) {
         break;
     case STATE_STAGE_BREAK:
         if (g_demoPlay) { Demo_End(); break; }
-        if (g_hexSongIds && g_game.nxGameMode == 2) {   /* NX WORLD TOUR: CContinue (nx_mission.c) */
+        /* era (NX WORLD TOUR): CContinue (nx_mission.c). NX2 WORLD MAX: tela de Stage Break normal; ao fim, com vidas volta ao
+         * mapa e sem vidas vai ao salvamento (USB_OUTPUT) ou GameOver
+        if (g_hexSongIds && g_game.nxGameMode == 2) {
             if (g_game.stateFrame == 1) NxContinue_Enter();
             NxContinue_Update(dt);
             break;
-        }
+        } */
         if (g_hexSongIds) {
             /* exceed.exe 0x4152B0 (Begin): 0x4229C8("BGA\SB.MOV", 0) sem loop;
              * se falhar vai para IDLE (aqui: GameOver). Toca GAMESTOP.WAV
@@ -773,6 +779,9 @@ void Game_Update(float dt) {
                 /* era: Game_ChangeState(STATE_GAMEOVER_ENTER); */
                 /* NX passo 19 (0x806005a): SPORTS se [0x81f8910] > 0 */
                 int sbStage = g_game.isBonusSong ? 3 : 2 - g_game.stageCount;
+                if (g_game.nxGameMode == 2)      /* flowcontrol.cpp StageBreak: WorldTour continua se ainda há vidas (bWTC) */
+                    Game_ChangeState(Nx2World_LivesLeft() > 0 ? STATE_SELECT : STATE_NX_USBOUT);
+                else
                 Game_ChangeState(NxSports_Route(STATE_GAMEOVER_ENTER, true, sbStage));
             }
             break;
@@ -1063,6 +1072,7 @@ void Game_Render(void) {
         case STATE_SELECT:
             /* ClassicSelect_Render(); */
             if (g_game.nxGameMode == 0 || g_game.nxGameMode == 1) Nx2Select_Render();
+            else if (g_game.nxGameMode == 2) Nx2World_Render();
             else NxSelect_Render();
             /* Select_Render(); */
             break;

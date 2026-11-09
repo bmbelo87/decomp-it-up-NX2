@@ -58,7 +58,9 @@ static BGALayerSrc s_scr[4], s_eff[4], s_txt[4];
 static bool both(void) { return (s_active & 3) == 3; }
 /* era: só travava TRAINING/WORLD MAX com os dois jogadores (ou EVENT). Pedido do usuário: ficam sempre inacessíveis
  * (cena "_lock" + som de erro) */
-static bool locked(void) { return s_sel == G_TRAINING || s_sel == G_WORLDMAX; }
+/* WORLD MAX: station.cpp trava com os dois jogadores (e EVENT, pelo piu); TRAINING segue sempre travado (ainda não portado) */
+static bool locked(void) { return s_sel == G_TRAINING || (s_sel == G_WORLDMAX && (both() || g_game.svcGameMode == 1)); }
+/* era: static bool locked(void) { return s_sel == G_TRAINING || s_sel == G_WORLDMAX; } */
 
 static void setText(void)
 {
@@ -109,8 +111,9 @@ void Nx2Station_Enter(void)
     Resource_ClearBGA();
     s_ok = Resource_LoadBGAByName("SELECT_STATION");
     if (!s_ok) Log_Print("NX2STATION: falha ao carregar BGA\\SELECT_STATION.DAT\n");
-    s_into = s_ok && Resource_LoadBGAByName("USB_INTO_OTHER_PLAYER");   /* animação de entrada tardia (índice 1) */
-    if (!s_into) Log_Print("NX2STATION: falha ao carregar BGA\\USB_INTO_OTHER_PLAYER.DAT\n");
+    /* era: USB_INTO_OTHER_PLAYER.DAT (hipótese). Confirmado pelo usuário: a entrada tardia usa o USB_COMMON.DAT (USB_OTHER_PLAYER_IN) */
+    s_into = s_ok && Resource_LoadBGAByName("USB_COMMON");   /* animação de entrada tardia (índice 1) */
+    if (!s_into) Log_Print("NX2STATION: falha ao carregar BGA\\USB_COMMON.DAT\n");
     BGA_Reset();
 
     if (!s_sndInit) {
@@ -167,7 +170,7 @@ static void processInput(int p)
             s_active |= (1u << p);
             Title_SetJoinedMask(Title_GetJoinedMask() | (1u << p));
             BGA_SceneReset(BG, "2player_in");
-            if (s_into) BGA_SceneReset(1, "USB_INTO_OTHER_PLAYER");
+            if (s_into) BGA_SceneReset(1, "USB_OTHER_PLAYER_IN");
             reorganize(s_state);
             setSceneAnimation();
         }
@@ -243,7 +246,7 @@ void Nx2Station_Update(float dt)
     }
     processInput(0);
     processInput(1);
-    if (s_join && BGA_SceneDone(BG, "2player_in") && (!s_into || BGA_SceneDone(1, "USB_INTO_OTHER_PLAYER"))) {      /* Next(true): volta ao USB_INPUT para ler o perfil */
+    if (s_join && BGA_SceneDone(BG, "2player_in") && (!s_into || BGA_SceneDone(1, "USB_OTHER_PLAYER_IN"))) {      /* Next(true): volta ao USB_INPUT para ler o perfil */
         Movie_Close();
         if (s_snd[SN_BGM] >= 0) Audio_Stop(s_snd[SN_BGM]);
         Title_SetJoinedMask(s_active);
@@ -277,6 +280,6 @@ void Nx2Station_Render(void)
     BGA_ScenePlay(BG, s_scene, true);
     if (s_join) BGA_ScenePlay(BG, "2player_in", true);
     if (s_join && s_into) {
-        BGA_ScenePlay(1, "USB_INTO_OTHER_PLAYER", true);
+        BGA_ScenePlay(1, "USB_OTHER_PLAYER_IN", true);
     }
 }

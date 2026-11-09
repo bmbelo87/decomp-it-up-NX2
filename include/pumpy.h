@@ -261,6 +261,20 @@ GameState NxSports_Route(GameState ns, bool fromStageBreak, int stage);
 void Nx2Select_Enter(void);        /* nx2_select.c — CSelect do NX2 (Arcade Station / Special Zone) */
 void Nx2Select_Update(float dt);
 void Nx2Select_Render(void);
+void Nx2World_Enter(void);         /* nx2_world.c — WORLD MAX (CSelectWorld do NX2) */
+void Nx2World_Update(float dt);
+void Nx2World_Render(void);
+void Nx2World_Leave(void);
+extern int g_nx2WGStart, g_nx2WGDisp, g_nx2WGLimit, g_nx2WGBonus;   /* gauge do WORLD MAX: @inicial %exibição #limite e bônus da vida comprada */
+extern int g_nxBankJudge[2][3][5], g_nxBankTotal[2][3];          /* estatisticas por banco de julgamento (NX2 m_Stat[bank]) */
+extern int g_nxBankMaxCombo[2][3], g_nxBankMaxMissCombo[2][3];
+extern bool g_nx2WorldBreak;       /* missão com Break ON (comando 'o'): só então a vida zerada dá Stage Break */
+int  Nx2World_LivesLeft(void);
+void Nx2WG_Enter(int player, int grade);   /* nx2_wgrade.c — CWorldGrade (resultado da missão); grade 0 S .. 5 F */
+bool Nx2WG_Update(float dt);
+void Nx2WG_Render(void);
+GameState Nx2WG_Next(void);
+extern bool g_nx2WGLottery;     /* vidas do WORLD MAX (m_nWorldLife) */
 void NxUsbIn_Update(float dt);   /* nx2_usbin.c */
 void NxUsbIn_Render(void);
 void NxUsbOut_Update(float dt);  /* nx2_usbout.c */

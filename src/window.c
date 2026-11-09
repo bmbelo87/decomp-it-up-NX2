@@ -212,6 +212,7 @@ void Window_Destroy(void) {
 
 /* Extra deste projeto (teste): PUMPY_SHOT="n1,n2,..." grava o backbuffer
  * em pumpy_shot_<n>.bmp nos quadros n (contados a partir do 1º swap). */
+int g_testShotNow;   /* teste: um código qualquer pede uma captura no próximo quadro */
 static void window_testShot(void) {
     static int s_frame, s_init, s_shots[16], s_nShots;
     if (!s_init) {
@@ -224,6 +225,7 @@ static void window_testShot(void) {
         }
     }
     s_frame++;
+    if (g_testShotNow) { if (s_nShots < 16) s_shots[s_nShots++] = s_frame + 1; g_testShotNow = 0; }
     for (int i = 0; i < s_nShots; i++) {
         if (s_shots[i] != s_frame || !g_win) continue;
         int w, h;
