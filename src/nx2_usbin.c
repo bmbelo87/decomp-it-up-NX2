@@ -114,9 +114,17 @@ static void setEmoticon(int p)
     }
 }
 
+static int s_curPos[2] = { -151, 870 }, s_delay[2];   /* DrawPlayPosition: o texto desliza para o lugar */
+
 static void setLicense(int p)   /* SetLisenceInWnd */
 {
     const Nx2Stat* s = &g_nx2Prof[p];
+    /* SetPlayerPosition: onde o WORLD MAX parou (continente e missão) */
+    /* SetLicenceText(szLand, szMission): o 1o texto (linha LAND, y 307) e o continente; o 2o (MISSION, y 324) e a missao */
+    Nx2Ttf_Set(p * 2, s->szLand);
+    Nx2Ttf_Set(p * 2 + 1, s->szMission);
+    s_curPos[p] = (p == 0) ? -151 : 870;
+    s_delay[p] = 0;
     setEmoticon(p);
     /* SetId: 8 letras nas camadas 1..8 (P1) / 11..18 (P2) da USB_LISENCE_ID */
     for (int i = 0; i < 8; i++) {
@@ -332,6 +340,13 @@ static void drawLicense(int p)   /* DrawLisenceWnd (modo entrada) */
         sceneP(UB, "LISENCE_INFO_%dP_IN", p, true);
         sceneP(UC, "LISENCE_ID_%dP_IN", p, true);
         sceneP(UE, "INFO_b_%dP_IN", p, true);
+        if (s_delay[p] > 3) {                              /* CUsbin::DrawPlayPosition: missão em y 307, continente 17 abaixo */
+            Nx2Ttf_DrawCentered(p * 2, s_curPos[p], 307);
+            Nx2Ttf_DrawCentered(p * 2 + 1, s_curPos[p], 307 + 17);
+            if (p == 0) { s_curPos[0] += 22; if (s_curPos[0] > 199) s_curPos[0] = 199; }
+            else { s_curPos[1] -= 22; if (s_curPos[1] < 520) s_curPos[1] = 520; }
+        }
+        s_delay[p]++;
     } else {
         sceneP(UA, "lisence_in_%dP_IN_(NOT USE USB)", p, true);
     }

@@ -251,6 +251,25 @@ static void textSet(NxMission* m)
     }
 }
 
+/* API para outras telas (USB_INPUT: posição do WORLD MAX no perfil): linhas de 14 px da nx.ttf, sombra +2,+2 */
+static WFont s_fExt;
+static WLine s_extLine[8];
+void Nx2Ttf_Set(int slot, const char* utf8)
+{
+    if (slot < 0 || slot >= 8) return;
+    wlineFree(&s_extLine[slot]);
+    if (!s_fExt.ok && !s_fExt.data) wfontLoad(&s_fExt, "nx.ttf", 14);
+    if (utf8 && utf8[0]) s_extLine[slot] = wlineMake(&s_fExt, utf8, (int)strlen(utf8));
+}
+/* DrawLicenceText: centrada em cx (largura = soma dos avanços) */
+void Nx2Ttf_DrawCentered(int slot, int cx, int y)
+{
+    if (slot < 0 || slot >= 8 || !s_extLine[slot].tex) return;
+    int len = s_extLine[slot].w - 2 * WTEXT_PAD;
+    wlineDraw(&s_extLine[slot], cx - len / 2, y);
+}
+void Nx2Ttf_Clear(void) { for (int i = 0; i < 8; i++) wlineFree(&s_extLine[i]); }
+
 /* ---- desenho de peças de sprite ---- */
 
 /* Texture_DrawUV recebe y de cima para baixo (yUp = 480 - y - h). Aqui as contas são em Y para cima (como o S3D do nx2src);
@@ -646,6 +665,11 @@ static const struct { int btn; int dir; } k_move[4] = { { PAD_DL, NXM_CONN_LL },
 
 static void startEnd(void)
 {
+    if (g_nx2HasProfile[s_player] && s_curM) {          /* select_mission.cpp: ps->szLand / szMission = onde o perfil ficou */
+        memset(ps()->szLand, 0, sizeof(ps()->szLand)); memset(ps()->szMission, 0, sizeof(ps()->szMission));
+        strncpy(ps()->szLand, s_curM->land, sizeof(ps()->szLand) - 1);
+        strncpy(ps()->szMission, s_curM->name, sizeof(ps()->szMission) - 1);
+    }
     s_bEnd = true;
     s_time = 0;
     s_cnt = 0;
@@ -1193,6 +1217,7 @@ void Nx2World_Enter(void)
             snprintf(b, sizeof(b), "%x", (unsigned)ps()->iWMPosition);
             start = NxMission_CurByStep(b);
         }
+        if (getenv("NX2WORLD_START")) { NxMission* t = NxMission_CurByStep(getenv("NX2WORLD_START")); if (t) start = t; }   /* teste: missao inicial (ex.: EF011) */
         if (!start) { short id[3] = { 0, 0, 1 }; start = NxMission_CurById(id); }
         if (start) start->show = true;
         s_curM = start;
