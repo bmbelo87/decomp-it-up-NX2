@@ -44,8 +44,19 @@ static float rdf(const uint8_t* b, size_t len, size_t o, bool* ok)
     return v;
 }
 
+/* charts de missao do WORLD MAX (STEP/EFnnn): o byte baixo da celula e o Attr do nx2src (step.h): 0x80 bNeedCheck (a nota e
+ * julgada), 0x40 bNoMiss, 0x20 bDrawBegin, 0x10 bDrawEnd. Seta falsa (Ghost 0x73): visivel e SEM bNeedCheck -> nao entra no
+ * julgamento, sem spark, sem miss e sem grade; vira o codigo 0x0d (seta falsa desenhada, gameplay.c misExtract). Seta
+ * Invisible/Hidden (0x83, 0xC3: julgada e sem desenho) vira 0x0e. */
+static bool s_nxMission;
+
 static uint8_t nxCell(uint16_t v)
 {
+    if (s_nxMission && (v & 7) == 3) {
+        bool chk = (v & 0x80) != 0, vis = (v & 0x30) != 0;
+        if (!chk) return vis ? 0x0d : 0;
+        if (!vis) return 0x0e;
+    }
     switch (v & 0xF) {
     case 3: return NT_TAP;
     case 4: return NT_HOLD_H;
@@ -118,7 +129,7 @@ static bool nxParse(const uint8_t* b, size_t len, int sec, StepChart* ch)
             uint16_t c[10];
             memcpy(c, b + ro, 2 * cols);
             nxFillRow(&rows[row0 + k], c, (int)cols);
-            for (uint32_t i = 0; i < cols; i++) { uint16_t t = c[i] & 0xF; if (t == 3 || t == 4) notes++; }
+            for (uint32_t i = 0; i < cols; i++) { uint8_t t = nxCell(c[i]); if (t == NT_TAP || t == NT_HOLD_H) notes++; }   /* era: c[i] & 0xF == 3 ou 4; as falsas (0x0d) e escondidas (0x0e) nao entram */
         }
         int32_t d = (int32_t)(delay + (delay >= 0 ? 0.5f : -0.5f));
         /* step.cpp:87..97 (CStep::Load): Speed < 0 -> sem vao de delay (Stop) e Speed = -Speed */
@@ -164,6 +175,7 @@ static bool nxParse(const uint8_t* b, size_t len, int sec, StepChart* ch)
 bool Step_LoadNX(const char* dir, StepSong* song)
 {
     memset(song, 0, sizeof(StepSong));
+    s_nxMission = strstr(dir, "/EF") != NULL || strstr(dir, "\\EF") != NULL;   /* so os charts de missao tem notas falsas/escondidas */
     for (size_t m = 0; m < sizeof(k_nxModes) / sizeof(k_nxModes[0]); m++) {
         char p[1024];
         snprintf(p, sizeof(p), "%s/%s.NX", dir, k_nxModes[m].name);
