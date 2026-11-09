@@ -319,6 +319,9 @@ bool Step_LoadSong(const char* path, StepSong* song)
         chart->rowCount = rowCount;
         chart->hasSplit = false;
         chart->segmentCount = 1;
+        chart->segments = (struct StepSegment*)calloc(STEP_MAX_BLOCK_Y, sizeof(*chart->segments));
+        if (!chart->segments) { free(decompBuf); continue; }
+        chart->segmentCap = STEP_MAX_BLOCK_Y;
         chart->segments[0].bpm = bpm;
         chart->segments[0].beatPerMeasure = beatPerMeasure;
         chart->segments[0].beatSplit = beatSplit;
@@ -642,6 +645,8 @@ void Step_FreeSong(StepSong* song)
     {
         free(song->charts[i].rows);
         song->charts[i].rows = NULL;
+        free(song->charts[i].segments);
+        song->charts[i].segments = NULL;
         for (int pg = 0; pg < STEP_DIV_MAX_PAGES; pg++)
             for (int br = 0; br < 10; br++) {
                 free(song->charts[i].divPages[pg].branchRows[br]);

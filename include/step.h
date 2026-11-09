@@ -77,7 +77,7 @@ typedef struct {
     bool hasSplit;
     // Per-segment timing (segments = main + each split block)
     uint32_t segmentCount; // main + number of splits
-    struct {
+    struct StepSegment {
         float bpm;
         uint32_t beatPerMeasure;
         uint32_t beatSplit;
@@ -87,7 +87,13 @@ typedef struct {
         int32_t speed;     // velocidade do bloco x1000 (bloco+96; 0 = sem multiplicador)
         uint8_t stopFlag;  // bloco+100: 1 = Stop (setas param delay x 10 ms); 0 = delay vira vão
                            // no scroll; outros valores = lixo do editor (o original só testa 0 e 1)
-    } segments[STEP_MAX_BLOCK_Y]; // era [8] (7 splits); o original aceita 50 blocos Y
+        /* .NX (NX10), nx2src step.h Step::Div: _beatsPerLine (+8, pode ser 0 = linhas sem avanço
+         * visual) e bmFlags & bSmooth (+0x1B). Só valem com isNX10. */
+        float bpl;
+        uint8_t smooth;
+    } *segments;       /* alocado: STX/SEE STEP_MAX_BLOCK_Y; NX10 = nBlock do arquivo (step.cpp: sem teto). Liberado em Step_FreeSong */
+    uint32_t segmentCap;
+    bool isNX10;       /* chart lido de um .NX: segmentos com bpl/smooth, Speed<0 = Stop (nx2src step.cpp:87) */ // era [8] (7 splits); o original aceita 50 blocos Y
 
     /* Division (seção 7): o header da seção tem 50 contagens de blocos; cada
      * contagem não-nula é uma PÁGINA e os blocos dela são RAMOS (PUMPY.EXE:

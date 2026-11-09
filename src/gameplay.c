@@ -311,6 +311,10 @@ static void holdOpenDbg(const char* tag, int p, int panel, int ri)
 
 static double getSegmentSpr(int seg)
 {
+    /* NX10: bpm 0 = bloco sem duração (msPerLine = 0, step.cpp:80): as linhas caem todas no
+     * msStart do bloco (Energizer/Feel The Soul CRAZY). Antes: 60/0 = inf e o resto da música
+     * ficava com tempo infinito. */
+    if (g_chart->segments[seg].bpm <= 0.0f || g_chart->segments[seg].beatSplit == 0) return 0.0;
     return 60.0 / ((double)g_chart->segments[seg].bpm * (double)g_chart->segments[seg].beatSplit);
 }
 
@@ -709,7 +713,7 @@ static double delayGapRows(int s)
      * do início do step (ex.: 312 Don't Bother Me HARD, dl=2230, 1ª nota na
      * linha 0) -> vira linhas em branco e as setas entram deslizando.
      * era: if (g_chart->delayDiv == 1000 && d > 0) return 0.0; */
-    if (g_chart->delayDiv == 1000 && d > 0 && s > 0) return 0.0;
+    if (g_chart->delayDiv == 1000 && d > 0 && s > 0 && !g_chart->isNX10) return 0.0;
     double beats = (d / (double)(g_chart->delayDiv > 0 ? g_chart->delayDiv : 100)) * (double)g_chart->segments[s].bpm / 60.0;
     /* era: (d / 100.0) — unidade da ZERO; no .SEE dava 10x o vão */
     return beats * (double)(g_baseBeatSplit > 0 ? g_baseBeatSplit : 4);
@@ -747,7 +751,7 @@ static double getRowAtTimeFloat(double t)
         {
             double tInSeg = t - accum - segDelay;
             if (tInSeg < 0) tInSeg = 0;
-            double ri = (double)g_chart->segments[s].rowStart + tInSeg / segSpr;
+            double ri = (double)g_chart->segments[s].rowStart + (segSpr > 0.0 ? tInSeg / segSpr : 0.0);
             if (ri < 0) ri = 0;
             if (ri >= (double)g_chart->rowCount) ri = (double)g_chart->rowCount - 1;
             return ri;
@@ -1294,7 +1298,7 @@ static void ctxDerive(void)
     {
         double total = 0;
         for (int s = 0; s < (int)g_chart->segmentCount; s++) {
-            double segSpr = 60.0 / ((double)g_chart->segments[s].bpm * (double)g_chart->segments[s].beatSplit);
+            double segSpr = getSegmentSpr(s);
             total += g_chart->segments[s].rowCount * segSpr + (g_chart->segments[s].delay / (double)g_chart->delayDiv);
         }
         g_totalSongSeconds = total;
@@ -1307,6 +1311,8 @@ static void ctxDerive(void)
         double vRow = 0;
         for (int s = 0; s < (int)g_chart->segmentCount; s++) {
             double beatRatio = (double)g_baseBeatSplit / (double)g_chart->segments[s].beatSplit;
+            /* NX10: o avanço visual por linha é o _beatsPerLine do bloco (pode ser 0), em linhas da divisão base */
+            if (g_chart->isNX10) beatRatio = (double)g_chart->segments[s].bpl * (double)g_baseBeatSplit;
             vRow += delayGapRows(s);
             for (uint32_t r = g_chart->segments[s].rowStart; r < g_chart->segments[s].rowStart + g_chart->segments[s].rowCount; r++) {
                 if ((int)r < g_visualRowCount) g_visualRow[r] = vRow;
@@ -1437,7 +1443,7 @@ static bool loadChartForSong(int songId, int diffTier, const char* modeName)
         double total = 0;
         for (int s = 0; s < g_chart->segmentCount; s++)
         {
-            double segSpr = 60.0 / ((double)g_chart->segments[s].bpm * (double)g_chart->segments[s].beatSplit);
+            double segSpr = getSegmentSpr(s);
             total += g_chart->segments[s].rowCount * segSpr + (g_chart->segments[s].delay / (double)g_chart->delayDiv);
         }
         g_totalSongSeconds = total;
@@ -1509,6 +1515,7 @@ static bool loadChartForSong(int songId, int diffTier, const char* modeName)
         double vRow = 0;
         for (int s = 0; s < g_chart->segmentCount; s++) {
             double beatRatio = (double)g_baseBeatSplit / (double)g_chart->segments[s].beatSplit;
+            if (g_chart->isNX10) beatRatio = (double)g_chart->segments[s].bpl * (double)g_baseBeatSplit;
             vRow += delayGapRows(s);   /* delay sem Stop = vão no scroll */
             for (uint32_t r = g_chart->segments[s].rowStart; r < g_chart->segments[s].rowStart + g_chart->segments[s].rowCount; r++) {
                 if ((int)r < g_visualRowCount) g_visualRow[r] = vRow;
@@ -2063,6 +2070,12 @@ static void judgeRows(int p)
 
     double badE = judgeBadEarly(), badL = judgeBadLate();
     while (g_zFirst[p] < g_zRows && g_zDone[p][g_zFirst[p]]) g_zFirst[p]++;
+    /* nx2src CStep::Judge (step.cpp:~1010..1040): maskedInput é consumido POR BOTÃO (maskedInput &= ~(1<<coluna))
+     * pela primeira linha da janela com nota pendente naquela coluna; as linhas seguintes continuam sendo
+     * varridas com os botões que sobraram. Antes: o primeiro aperto do quadro encerrava a busca (hitNow ->
+     * break) e os outros botões pisados no mesmo quadro eram perdidos. Energizer CRAZY: 3 setas em 3 linhas
+     * do mesmo instante (blocos de BPM 0) -> a 2ª e a 3ª viravam MISS. */
+    bool usedB[10] = { false };
 
     /* 1) acertos: a primeira linha com nota pisada encerra a busca do quadro */
     for (int ri = g_zFirst[p]; ri < g_zRows; ri++) {
@@ -2103,11 +2116,16 @@ static void judgeRows(int p)
                 if ((pv == NT_HOLD_H || pv == NT_HOLD_B) && !(g_zHit[p][ri - 1] & (1u << pan)))
                     continue;   /* parte anterior ainda pendente: nem segurar nem apertar consome esta */
             }
-            if (!hitB[pan] && !autoHit && !holdHit) continue;
+            if ((!hitB[pan] || usedB[pan]) && !autoHit && !holdHit) continue;
+            /* nx2src step.cpp:997..1010 (Judge, long Attr & 4): a CABEÇA (LongStart) só é consumida com a linha já
+             * no receptor (v112 <= 0) e o botão segurado; apertar antes não a consome. O port tratava a cabeça
+             * como seta comum e a consumia no aperto adiantado (até a janela de BAD), o hold "grudava" no
+             * receptor antes da hora e os longs curtos acabavam antes de chegar. */
+            if (v == NT_HOLD_H && !holdHit && !autoHit) continue;
             JudgeType jt = (autoHit || holdHit) ? JT_PERFECT : evaluateTiming(diff);
             if (jt == JT_MISS || jt == JT_NONE) continue;      /* fora da janela */
             /* era: hitNow = true; */
-            if (hitB[pan] && !holdHit && !autoHit) hitNow = true;
+            if (hitB[pan] && !holdHit && !autoHit) { hitNow = true; usedB[pan] = true; }
             if (ZJ_ISHOLD(v)) {
                 noteExplode(p, pan, ri);
                 ZJ_CLR(ri, pan);
@@ -2152,7 +2170,8 @@ static void judgeRows(int p)
             g_zDone[p][ri] = 1;                                  /* também linha vazia */
         }
         (void)any;
-        if (hitNow) break;
+        /* era: if (hitNow) break;   (um aperto resolvia só a primeira linha do quadro) */
+        (void)hitNow;
     }
 
     /* 2) MISS: passou da janela de BAD com nota sem pisar -> um MISS na linha */
@@ -3349,18 +3368,36 @@ void Gameplay_Update(float dt)
              * abaixo (±0,05x/frame, 0x414888) é a mesma do 1/2/3.
             float speedDiff = g_scrollSpeedTarget[_p] - g_scrollSpeedX[_p]; */
             float blockMul = 1.0f;
+            bool smoothBlk = false;
             if (g_chart && currentRow >= 0) {
                 for (uint32_t s = 0; s < g_chart->segmentCount; s++) {
                     uint32_t s0 = g_chart->segments[s].rowStart;
                     if ((uint32_t)currentRow >= s0 && (uint32_t)currentRow < s0 + g_chart->segments[s].rowCount) {
                         if (g_chart->segments[s].speed > 0) blockMul = (float)g_chart->segments[s].speed * 0.001f;
+                        /* playengine.cpp:2866 (DrawStep): bloco com bSmooth interpola a velocidade do bloco
+                         * anterior ate a deste, de DivEndTime(anterior) a DivEndTime(atual); m_HighSpeed
+                         * recebe m_ModSpeed direto (sem a rampa de 0.05). */
+                        if (g_chart->isNX10 && g_chart->segments[s].smooth &&
+                            !g_game.cmdRandomVelocity[_p] && !g_game.cmdEarthworm[_p]) {
+                            float prevMul = 1.0f;
+                            if (s > 0 && g_chart->segments[s - 1].speed > 0) prevMul = (float)g_chart->segments[s - 1].speed * 0.001f;
+                            double t0;
+                            t0 = (s > 0) ? getRowTime((int)g_chart->segments[s - 1].rowStart) + g_chart->segments[s - 1].rowCount * getSegmentSpr((int)s - 1) : 0.0;
+                            double t1 = getRowTime((int)s0) + g_chart->segments[s].rowCount * getSegmentSpr((int)s);
+                            double per = (t1 > t0) ? (g_songTime - t0) / (t1 - t0) : 1.0;
+                            if (per < 0.0) per = 0.0; else if (per > 1.0) per = 1.0;
+                            blockMul = prevMul + (blockMul - prevMul) * (float)per;
+                            smoothBlk = true;
+                        }
                         break;
                     }
                 }
             }
             float speedDiff = g_scrollSpeedTarget[_p] * blockMul - g_scrollSpeedX[_p];
             float speedStep = 3.0f * dt;
-            if (fabsf(speedDiff) > speedStep)
+            if (smoothBlk)
+                g_scrollSpeedX[_p] = g_scrollSpeedTarget[_p] * blockMul;
+            else if (fabsf(speedDiff) > speedStep)
                 g_scrollSpeedX[_p] += (speedDiff > 0.0f) ? speedStep : -speedStep;
             else
                 g_scrollSpeedX[_p] = g_scrollSpeedTarget[_p] * blockMul; /* era: g_scrollSpeedTarget[_p] */
@@ -4072,7 +4109,7 @@ static void gpScroll(GpScroll* S, int receptorY, int scrollBottom)
             visualScrollRow += (g_visualRow[vr + 1] - g_visualRow[vr]) * frac;
         visualScrollRow = visualScrollInDelay(g_songTime, visualScrollRow);
     }
-    float currentPixelsPerSec = (float)(pixelsPerRow / currentSpr);
+    float currentPixelsPerSec = (currentSpr > 0.0) ? (float)(pixelsPerRow / currentSpr) : 0.0f;
 
     // Determine visible actual row range (uses actualScrollRow, which is in actual-row space)
     int startRow = (int)actualScrollRow - (int)(480 / pixelsPerRow) - 2;

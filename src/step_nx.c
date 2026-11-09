@@ -88,8 +88,13 @@ static bool nxParse(const uint8_t* b, size_t len, int sec, StepChart* ch)
     memset(ch, 0, sizeof(*ch));
     ch->sectionIndex = sec;
     ch->delayDiv = 1000;
+    ch->isNX10 = true;
     ch->panelCount = (cols == 5) ? STEP_PANELS_SINGLE : STEP_PANELS_DOUBLE;
     ch->rows = rows;
+    /* nx2src CStep::Load: sem limite de blocos, usa o nBlock do arquivo. Um segmento por seccao no maximo. */
+    ch->segments = (struct StepSegment*)calloc(nSec, sizeof(*ch->segments));
+    if (!ch->segments) { free(rows); ch->rows = NULL; return false; }
+    ch->segmentCap = nSec;
 
     uint32_t row0 = 0, nseg = 0, merged = 0;
     int notes = 0;
@@ -97,10 +102,13 @@ static bool nxParse(const uint8_t* b, size_t len, int sec, StepChart* ch)
         uint32_t so = rd32(b, len, 16 + 4 * s, &ok), bo = rd32(b, len, so + 4, &ok);
         float bpm = rdf(b, len, bo + 4, &ok), delay = rdf(b, len, bo + 0xC, &ok), spd = rdf(b, len, bo + 0x10, &ok);
         uint32_t n = rd32(b, len, bo + 0x1C, &ok);
-        uint16_t split = 0, meas = 0;
+        /* nx2src Step::Div: +0x18 char nBeatSplit, +0x19 pad, +0x1A char _beatsPerMeasure, +0x1B char bmFlags
+         * (bSmooth = 1). Antes lia u16 em +0x18/+0x1A e o flag entrava em beatPerMeasure (D02: 260). */
+        float bpl = rdf(b, len, bo + 8, &ok);
+        uint16_t split = 0, meas = 0, smooth = 0;
         if (bo + 0x1C > len) ok = false;
         if (!ok) break;
-        memcpy(&split, b + bo + 0x18, 2); memcpy(&meas, b + bo + 0x1A, 2);
+        split = b[bo + 0x18]; meas = b[bo + 0x1A]; smooth = b[bo + 0x1B] & 1;
         for (uint32_t k = 0; k < n; k++) {
             uint32_t ro = rd32(b, len, bo + 0x20 + 4 * k, &ok);
             if (!ok) break;
@@ -112,18 +120,24 @@ static bool nxParse(const uint8_t* b, size_t len, int sec, StepChart* ch)
             for (uint32_t i = 0; i < cols; i++) { uint16_t t = c[i] & 0xF; if (t == 3 || t == 4) notes++; }
         }
         int32_t d = (int32_t)(delay + (delay >= 0 ? 0.5f : -0.5f));
-        int32_t sp = (int32_t)(spd * 1000.0f + (spd >= 0 ? 0.5f : -0.5f));
+        /* step.cpp:87..97 (CStep::Load): Speed < 0 -> sem vao de delay (Stop) e Speed = -Speed */
+        uint8_t stop = (spd < 0.0f) ? 1 : 0;
+        if (spd < 0.0f) spd = -spd;
+        int32_t sp = (int32_t)(spd * 1000.0f + 0.5f);
 
         /* mescla com o anterior se for identico e sem delay (o jogo guarda ate STEP_MAX_BLOCK_Y segmentos) */
         if (nseg > 0 && d == 0 &&
             ch->segments[nseg - 1].bpm == bpm && ch->segments[nseg - 1].beatSplit == split &&
-            ch->segments[nseg - 1].beatPerMeasure == meas && ch->segments[nseg - 1].speed == sp) {
+            ch->segments[nseg - 1].beatPerMeasure == meas && ch->segments[nseg - 1].speed == sp &&
+            ch->segments[nseg - 1].bpl == bpl && ch->segments[nseg - 1].smooth == smooth &&
+            ch->segments[nseg - 1].stopFlag == stop) {
             ch->segments[nseg - 1].rowCount += n;
             merged++;
-        } else if (nseg < STEP_MAX_BLOCK_Y) {
+        } else if (nseg < nSec) {
             ch->segments[nseg].bpm = bpm; ch->segments[nseg].beatSplit = split; ch->segments[nseg].beatPerMeasure = meas;
             ch->segments[nseg].delay = d; ch->segments[nseg].rowStart = row0; ch->segments[nseg].rowCount = n;
-            ch->segments[nseg].speed = sp; ch->segments[nseg].stopFlag = 0;
+            ch->segments[nseg].speed = sp; ch->segments[nseg].stopFlag = stop;
+            ch->segments[nseg].bpl = bpl; ch->segments[nseg].smooth = (uint8_t)smooth;
             nseg++;
         } else {
             ch->segments[nseg - 1].rowCount += n;   /* estourou: o resto fica no ultimo (log abaixo) */
@@ -131,7 +145,7 @@ static bool nxParse(const uint8_t* b, size_t len, int sec, StepChart* ch)
         }
         row0 += n;
     }
-    if (!ok || nseg == 0) { free(rows); ch->rows = NULL; return false; }
+    if (!ok || nseg == 0) { free(rows); free(ch->segments); ch->rows = NULL; ch->segments = NULL; return false; }
 
     ch->rowCount = row0;
     ch->segmentCount = nseg;
