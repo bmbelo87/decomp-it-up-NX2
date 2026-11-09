@@ -273,6 +273,7 @@ static bool s_joining, s_joinAnim;   /* s_joining: congelada tocando USB_OTHER_P
 static bool s_joinReturn, s_jr;   /* entrada tardia (GameJoinProcess): vai ao USB_INPUT e volta à Select; s_jr = esta entrada é a volta */
 static int  s_joinId;
 bool Nx2Select_JoinPending(void) { return s_joinReturn; }
+static void songText(void);
 
 void Nx2Select_Enter(void)
 {
@@ -400,6 +401,7 @@ void Nx2Select_Enter(void)
         if (getenv("PUMPY_P2MODE")) { s_mode[1] = s_userMode[1] = atoi(getenv("PUMPY_P2MODE")); }   /* teste: dificuldade do P2 */
         validateMode();
         setExerciseInfo();
+        songText();
         BGA_SceneReset(UA, s_special ? "special_inter_a" : "arcade_intro_a");
         BGA_SceneReset(UB, s_special ? "special_intro_b" : "arcade_intro_b");
         BGA_SceneReset(UC, "base_intro_c");
@@ -582,6 +584,20 @@ static bool findFile(int id, const char* fmt, char* out, size_t sz)
     return false;
 }
 
+/* SetSongInfoText (select.cpp:2948): so musica disponivel (senao texto vazio). Idioma KR: "titulo- artista- BPM:bpm";
+ * senao "titulo- artista- BPM: bpm" (EN). g_worldMediumFont.SetText(buffer, 385). */
+static void songText(void)
+{
+    const TrackEntry* e = &g_songTable[s_list[s_cur]];
+    char buf[512 * 3];
+    if (!e->avail) buf[0] = 0;
+    else if (g_nx2Opt.g_Language == 0)
+        snprintf(buf, sizeof(buf), "%s- %s- BPM:%s", e->titleKr, e->artistKr, e->bpmText ? e->bpmText : "");
+    else
+        snprintf(buf, sizeof(buf), "%s- %s- BPM: %s", e->titleEn, e->artistEn, e->bpmText ? e->bpmText : "");
+    Nx2Info_Set(buf, 385);
+}
+
 static void previewStop(void)
 {
     if (!s_previewOn) return;
@@ -606,6 +622,7 @@ static void previewStart(void)
     if (findFile(id, "%s/AUDIO/INTRO/%03X.AUD", aud, sizeof(aud)) && BGM_LoadAUDDirect(aud)) BGM_Play(false);
     s_previewOn = true;
     s_prevSong = s_list[s_cur];
+    Nx2Info_SetScroll(true);                                  /* g_worldMediumFont.SetScroll(true) quando a previa carrega */
 }
 
 static bool anyPadDown(void)                              /* isButtonPressed */
@@ -675,6 +692,7 @@ static void move(int p, int k, PadButton b, int dir)
     if (dir < 0) s_cur = s_cur ? s_cur - 1 : s_count - 1; else s_cur = (s_cur < s_count - 1) ? s_cur + 1 : 0;
     reorganize(s_state);
     setSceneAnimation();
+    songText();
     if (held) {
         s_arrowHold = true;
         if (s_acc < 720) s_acc += 30;
@@ -965,7 +983,7 @@ static void launch(void)
     if (s_special && !g_songTable[s_list[s_cur]].avail) {          /* GetRandomMusic */
         int n = 0;
         for (int i = 0; i < s_count; i++) n += g_songTable[s_list[i]].avail ? 1 : 0;
-        if (n) { do s_cur = rand() % s_count; while (!g_songTable[s_list[s_cur]].avail); validateMode(); }
+        if (n) { do s_cur = rand() % s_count; while (!g_songTable[s_list[s_cur]].avail); validateMode(); songText(); }
     }
     const TrackEntry* e = &g_songTable[s_list[s_cur]];
     previewStop();
@@ -1082,6 +1100,7 @@ void Nx2Select_Update(float dt)
         return;
     }
 
+    if (s_state == SM_NONE) Nx2Info_Update(dt);           /* DrawHScrollText so desenha (e anda) com a roda parada */
     if (s_state == SM_NONE && !anyPadDown() && !s_previewOn && s_prevSong != s_list[s_cur]) previewStart();
     if (s_previewOn && s_state == SM_NONE) previewUpdate(dt);
 }
@@ -1119,6 +1138,7 @@ void Nx2Select_Render(void)
     if (s_state == SM_NONE) {
         drawLV();
         BGA_ScenePlay(UD, "level_glow_channel_color", true);
+        Nx2Info_Draw();                                    /* g_worldMediumFont.DrawHScrollText(true, true) */
     }
     BGA_ScenePlay(UC, "base_hold_c", true);
     BGA_ScenePlay(UC, twoPlayers() ? "degree of difficulty_dual_1p_in" : "degree of difficulty_single_in", true);

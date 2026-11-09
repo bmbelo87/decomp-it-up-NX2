@@ -268,6 +268,11 @@ void Nx2World_Leave(void);
 void Nx2Ttf_Set(int slot, const char* utf8);          /* nx2_world.c: linha TTF (nx.ttf, 14 px) em um dos 8 slots */
 void Nx2Ttf_DrawCentered(int slot, int cx, int y);
 void Nx2Ttf_Clear(void);
+void Nx2Info_Set(const char* utf8, int y);            /* nx2_world.c: CInfoFont da Select (nx.ttf 18, rolagem horizontal) */
+void Nx2Info_SetScroll(bool v);
+void Nx2Info_Update(float dt);
+void Nx2Info_Draw(void);
+void Nx2Info_Clear(void);
 extern int g_nx2WGStart, g_nx2WGDisp, g_nx2WGLimit, g_nx2WGBonus;   /* gauge do WORLD MAX: @inicial %exibição #limite e bônus da vida comprada */
 extern int g_nxBankJudge[2][3][5], g_nxBankTotal[2][3];          /* estatisticas por banco de julgamento (NX2 m_Stat[bank]) */
 extern int g_nxBankMaxCombo[2][3], g_nxBankMaxMissCombo[2][3];

@@ -270,6 +270,71 @@ void Nx2Ttf_DrawCentered(int slot, int cx, int y)
 }
 void Nx2Ttf_Clear(void) { for (int i = 0; i < 8; i++) wlineFree(&s_extLine[i]); }
 
+/* ---- CInfoFont::SetText / SetScroll / DrawHScrollText(shadow, arcade = true) da Select (g_worldMediumFont = "nx.ttf", 18) ----
+ * SetText(texto, y = 385): x = 190, rolagem desligada, atraso 0. A cada desenho: com a rolagem ligada e atraso > 45, x -= 3;
+ * x < 170 e largura + x < -50 volta para x = 490; atraso++. Máscara (stencil) trapezoidal da arcade, Y para cima:
+ * (156,97) (132,75) (507,75) (483,97). Sem sombra (o drawTTFString não a desenha). */
+static WFont s_fInfo;
+static WLine s_infoLine;
+static int   s_infoX, s_infoY, s_infoDelay;
+static bool  s_infoScroll;
+static float s_infoAcc;
+
+void Nx2Info_Set(const char* utf8, int y)
+{
+    wlineFree(&s_infoLine);
+    if (!s_fInfo.ok && !s_fInfo.data) wfontLoad(&s_fInfo, "nx.ttf", 18);
+    s_infoDelay = 0; s_infoScroll = false; s_infoX = 190; s_infoY = y; s_infoAcc = 0.0f;
+    if (utf8 && utf8[0]) s_infoLine = wlineMake(&s_fInfo, utf8, (int)strlen(utf8));
+}
+void Nx2Info_SetScroll(bool v) { s_infoScroll = v; }
+void Nx2Info_Clear(void) { wlineFree(&s_infoLine); }
+
+/* um passo por 1/60 s (o original anda um passo por desenho, a 60 quadros) */
+void Nx2Info_Update(float dt)
+{
+    if (!s_infoLine.tex) return;
+    s_infoAcc += dt * 60.0f;
+    while (s_infoAcc >= 1.0f) {
+        s_infoAcc -= 1.0f;
+        if (s_infoScroll) {
+            if (s_infoDelay > 45) s_infoX -= 3;
+            if (s_infoX < 170 && (s_infoLine.w - 2 * WTEXT_PAD) + s_infoX < -50) s_infoX = 490;
+        }
+        s_infoDelay++;
+    }
+}
+
+static float infoLeft(float y)  { return 132.0f + (156.0f - 132.0f) * (y - 75.0f) / 22.0f; }
+static float infoRight(float y) { return 507.0f + (483.0f - 507.0f) * (y - 75.0f) / 22.0f; }
+
+void Nx2Info_Draw(void)
+{
+    const WLine* l = &s_infoLine;
+    if (!l->tex) return;
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBindTexture(GL_TEXTURE_2D, l->tex);
+    glColor4f(1.f, 1.f, 1.f, 1.f);
+    float x0 = (float)s_infoX - WTEXT_PAD, yTop = 480.0f - (float)s_infoY;
+    glBegin(GL_QUADS);
+    for (int r = 0; r < l->h; r++) {                       /* uma faixa por linha de pixel, recortada no trapezio */
+        float t = yTop - (float)r, b = t - 1.0f, ym = t - 0.5f;
+        if (ym > 97.0f || ym < 75.0f) continue;
+        float a = x0 > infoLeft(ym) ? x0 : infoLeft(ym);
+        float e = x0 + (float)l->w < infoRight(ym) ? x0 + (float)l->w : infoRight(ym);
+        if (e <= a) continue;
+        float u0 = (a - x0) / (float)l->w, u1 = (e - x0) / (float)l->w;
+        float v0 = (float)r / (float)l->h, v1 = (float)(r + 1) / (float)l->h;
+        glTexCoord2f(u0, v0); glVertex2f(a, t);
+        glTexCoord2f(u1, v0); glVertex2f(e, t);
+        glTexCoord2f(u1, v1); glVertex2f(e, b);
+        glTexCoord2f(u0, v1); glVertex2f(a, b);
+    }
+    glEnd();
+}
+
 /* ---- desenho de peças de sprite ---- */
 
 /* Texture_DrawUV recebe y de cima para baixo (yUp = 480 - y - h). Aqui as contas são em Y para cima (como o S3D do nx2src);
